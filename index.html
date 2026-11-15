@@ -50,7 +50,7 @@ details summary{cursor:pointer;color:var(--mut)}
  <div class="row"><label class="btn" for="fb">Upload boundary KMZ / KML</label><input id="fb" type="file" accept=".kmz,.kml"></div>
  <div class="msg" id="mb">Upload the file that holds your mapped boundary polygon.</div></section>
 <section><h2><b>2</b>Roads &amp; buildings</h2>
- <div class="row"><button id="bfetch" disabled>Fetch from OpenStreetMap</button></div>
+ <div class="row"><button id="bfetch" disabled>Fetch from OpenStreetMap</button><button class="sec" id="bcancel" style="display:none">Cancel</button></div>
  <div class="msg" id="mf">Pulls every building and road inside the boundary. Needs an internet connection.</div>
  <details style="margin-top:8px"><summary>Edit homes on the map</summary>
   <div class="row" style="margin:8px 0"><button class="sec" id="madd">+ Add home</button><button class="sec" id="mdel">&minus; Remove home</button><select id="mkind" style="width:auto"><option value="sdu">Single home</option><option value="mdu">Multi-unit (6)</option><option value="biz">Business / church</option></select></div>
@@ -1006,7 +1006,7 @@ $("fb").onchange = async e => {
   try {
     const kml = await readKml(f); const rings = parsePolygons(kml);
     if (!rings.length) throw new Error("No polygon found. The boundary must be a drawn polygon (or a closed line).");
-    S.boundary = rings; S.bbox = bboxOf(rings); S.name = f.name.replace(/\.(kmz|kml)$/i, ""); S.osm = null; S.plan = null; S.extra = []; S.removed = new Set();
+    S.boundary = rings; S.bbox = bboxOf(rings); S.name = f.name.replace(/\.(kmz|kml)$/i, ""); S.osm = null; S.cells = null; S.plan = null; S.extra = []; S.removed = new Set();
     const b = S.bbox, kmx = 111.32 * Math.cos((b[1] + b[3]) / 2 * Math.PI / 180), area = (b[2] - b[0]) * kmx * (b[3] - b[1]) * 110.57;
     say("mb", f.name + " — " + rings.length + " polygon" + (rings.length > 1 ? "s" : "") + ", bounding box about " + area.toFixed(2) + " km².", "ok");
     if (area > 25) say("mb", f.name + " loaded, but the area is large (" + area.toFixed(0) + " km² box). OpenStreetMap may time out — consider splitting it.", "err");
@@ -1019,33 +1019,68 @@ $("fb").onchange = async e => {
 
 /* ------------------------------------------------------------ OpenStreetMap */
 const MIRRORS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
-async function overpass(q) {
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let fetchAbort = false;
+async function overpassOnce(u, q, ms) {
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await fetch(u, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" }, signal: ctl.signal });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json(); if (!j || !j.elements) throw new Error("bad reply"); if (j.remark && /timed out|out of memory/i.test(j.remark) && !j.elements.length) throw new Error("server busy");
+    return j;
+  } catch (e) { throw e.name === "AbortError" ? new Error("timed out") : e; } finally { clearTimeout(to); }
+}
+async function overpass(q, attempt0) {
   let last = null;
-  for (const u of MIRRORS) {
-    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 100000);
-    try {
-      const r = await fetch(u, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" }, signal: ctl.signal });
-      clearTimeout(to);
-      if (!r.ok) { last = new Error("Server " + new URL(u).host + " answered " + r.status); continue; }
-      const j = await r.json(); if (j && j.elements) return j; last = new Error("Unexpected reply from " + new URL(u).host);
-    } catch (e) { clearTimeout(to); last = e.name === "AbortError" ? new Error("OpenStreetMap server timed out") : e; }
+  for (let a = 0; a < 6; a++) {
+    if (fetchAbort) throw new Error("cancelled");
+    const u = MIRRORS[(a + (attempt0 || 0)) % MIRRORS.length];
+    try { return await overpassOnce(u, q, 45000); } catch (e) { last = e; await sleep(/429|503|504|busy/.test(e.message) ? 2500 : 800); }
   }
-  throw last || new Error("No OpenStreetMap server reachable");
+  throw last || new Error("no server reachable");
+}
+/* split the boundary's bounding box into small cells so each request is light; skip cells outside the boundary */
+function makeCells(b) {
+  const CELL = 0.0065, pad = 0.0004, cells = [];
+  const nx = Math.max(1, Math.ceil((b[2] - b[0]) / CELL)), ny = Math.max(1, Math.ceil((b[3] - b[1]) / CELL));
+  const dx = (b[2] - b[0]) / nx, dy = (b[3] - b[1]) / ny;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+    const x0 = b[0] + i * dx, y0 = b[1] + j * dy, x1 = x0 + dx, y1 = y0 + dy; let hit = false;
+    for (let u = 0; u <= 6 && !hit; u++) for (let v = 0; v <= 6 && !hit; v++) if (inBoundary(x0 + dx * u / 6, y0 + dy * v / 6)) hit = true;
+    if (!hit) S.boundary.forEach(r => r.forEach(p => { if (p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1) hit = true; }));
+    if (hit) cells.push([y0 - pad, x0 - pad, y1 + pad, x1 + pad]);
+  }
+  return cells;
 }
 $("bfetch").onclick = async () => {
   if (!S.bbox) return;
-  const pad = 0.0004, b = S.bbox, bb = [b[1] - pad, b[0] - pad, b[3] + pad, b[2] + pad].map(v => v.toFixed(6)).join(",");
-  const q = `[out:json][timeout:90];(way["building"](${bb});way["highway"](${bb}););out geom;`;
-  busy(true, "Downloading buildings and roads…"); await nextFrame();
-  try {
-    const j = await overpass(q); S.osm = FP.parseOverpass(j); S.plan = null; S.removed = new Set();
-    const inside = S.osm.buildings.filter(x => inBoundary(x.lon, x.lat)).length;
-    say("mf", "Found " + inside + " buildings inside the boundary and " + S.osm.roads.length + " road segments nearby.", inside ? "ok" : "err");
-    if (!inside) say("mf", "OpenStreetMap has no buildings in this boundary. Add homes manually or import home points (see “Edit homes on the map”).", "err");
-    $("bgen").disabled = false; $("res").style.display = "none";
-  } catch (e) { say("mf", "Could not reach OpenStreetMap: " + (e.message || e) + ". Check your connection and try again.", "err"); }
-  busy(false); map.redraw();
+  if (!S.cells) S.cells = { list: makeCells(S.bbox), done: new Map() };
+  const C = S.cells, todo = C.list.map((c, i) => i).filter(i => !C.done.has(i)), total = C.list.length;
+  fetchAbort = false; $("bcancel").style.display = ""; $("bfetch").disabled = true;
+  let ok = 0, fail = 0, idx = 0;
+  const upd = () => say("mf", "Downloading from OpenStreetMap… area " + (C.done.size) + " of " + total + " done" + (fail ? " (" + fail + " retrying/failed)" : "") + ".");
+  upd();
+  const worker = async () => {
+    while (idx < todo.length && !fetchAbort) {
+      const i = todo[idx++], bb = C.list[i].map(v => v.toFixed(6)).join(",");
+      const q = `[out:json][timeout:40];(way["building"](${bb});way["highway"](${bb}););out geom;`;
+      try { C.done.set(i, await overpass(q, i)); ok++; } catch (e) { fail++; C.lastErr = e.message; }
+      upd();
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  $("bcancel").style.display = "none"; $("bfetch").disabled = false;
+  if (fetchAbort) { say("mf", "Cancelled. " + C.done.size + " of " + total + " areas downloaded — click Fetch again to continue.", "err"); return; }
+  if (C.done.size < total) { say("mf", C.done.size + " of " + total + " areas downloaded; " + (total - C.done.size) + " failed (" + C.lastErr + "). The free OpenStreetMap servers are busy — wait a minute and click Fetch again; finished areas are kept.", "err"); return; }
+  const seen = new Set(), els = [];
+  C.done.forEach(j => j.elements.forEach(e => { const k = e.type + e.id; if (!seen.has(k)) { seen.add(k); els.push(e); } }));
+  S.osm = FP.parseOverpass({ elements: els }); S.plan = null; S.removed = new Set();
+  const inside = S.osm.buildings.filter(x => inBoundary(x.lon, x.lat)).length;
+  say("mf", "Found " + inside + " buildings inside the boundary and " + S.osm.roads.length + " road segments nearby.", inside ? "ok" : "err");
+  if (!inside) say("mf", "OpenStreetMap has no buildings in this boundary. Add homes manually or import home points (see “Edit homes on the map”).", "err");
+  enableGen(); $("res").style.display = "none"; map.redraw();
 };
+$("bcancel").onclick = () => { fetchAbort = true; };
 
 /* ------------------------------------------------------------ manual edits */
 function setMode(m) { S.mode = S.mode === m ? "view" : m; $("madd").classList.toggle("on", S.mode === "add"); $("mdel").classList.toggle("on", S.mode === "del"); $("cv").style.cursor = S.mode === "view" ? "grab" : "crosshair"; }
