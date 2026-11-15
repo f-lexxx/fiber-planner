@@ -1,0 +1,1270 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fiber Planner</title>
+<style>
+:root{--bg:#0f1a1e;--panel:#162328;--panel2:#1c2d33;--line:#2a3f46;--tx:#e6f0f2;--mut:#8fa9b0;--acc:#2ee6a6;--acc2:#19b784;--warn:#ffb020;--bad:#ff5d5d;--ok:#2ee6a6;font-size:14px}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:16px;margin:0;letter-spacing:.02em}header small{color:var(--mut)}
+.logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),#0b7);display:grid;place-items:center;color:#042;font-weight:800}
+main{flex:1;display:flex;min-height:0}
+aside{width:380px;max-width:100%;overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:12px 14px 30px}
+#mapwrap{flex:1;position:relative;min-width:0}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+section{border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:10px 12px;margin-bottom:10px}
+section h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+section h2 b{background:var(--acc);color:#032;border-radius:50%;width:18px;height:18px;display:inline-grid;place-items:center;font-size:11px}
+button,.btn{font:inherit;background:var(--acc);color:#032;border:0;border-radius:8px;padding:8px 12px;font-weight:650;cursor:pointer;display:inline-block}
+button:hover,.btn:hover{background:var(--acc2)}button:disabled{opacity:.4;cursor:not-allowed}
+button.sec{background:transparent;color:var(--tx);border:1px solid var(--line)}button.sec:hover{background:#223840}
+button.sec.on{border-color:var(--acc);color:var(--acc)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=number],select{background:#0f1a1e;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:inherit;width:100%}
+input[type=file]{display:none}
+label.f{display:grid;grid-template-columns:1fr 78px;gap:8px;align-items:center;margin:4px 0;color:var(--mut)}
+.msg{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.45}.msg.err{color:var(--bad)}.msg.ok{color:var(--ok)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tile{background:#0f1a1e;border:1px solid var(--line);border-radius:8px;padding:6px 8px}.tile b{font-size:18px;display:block}.tile span{color:var(--mut);font-size:11px}
+.chk{display:flex;gap:7px;margin:5px 0;font-size:12.5px;line-height:1.35}.chk i{font-style:normal;width:16px;flex:none;text-align:center}
+.chk.p i{color:var(--ok)}.chk.f i{color:var(--bad)}.chk.s i{color:var(--warn)}.chk span{color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:4px 5px;text-align:right;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500}
+tbody tr{cursor:pointer}tbody tr:hover{background:#223840}
+.sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+details summary{cursor:pointer;color:var(--mut)}
+.hud{position:absolute;left:10px;bottom:10px;background:#0f1a1eE6;border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:11.5px;color:var(--mut)}
+.tools{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.tools .box{background:#0f1a1eE6;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px}
+.tools label{display:flex;gap:6px;align-items:center;margin:2px 0;cursor:pointer}
+.zoom{display:flex;gap:4px}.zoom button{width:32px;padding:6px 0;font-size:16px}
+.banner{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#3a2a05;border:1px solid var(--warn);color:#ffd88a;border-radius:8px;padding:6px 12px;font-size:12px;display:none;max-width:70%}
+.busy{position:absolute;inset:0;background:#0008;display:none;place-items:center;font-size:15px}.busy.on{display:grid}
+.spin{width:34px;height:34px;border:4px solid #fff3;border-top-color:var(--acc);border-radius:50%;animation:s 1s linear infinite;margin:0 auto 10px}@keyframes s{to{transform:rotate(360deg)}}
+@media(max-width:820px){main{flex-direction:column-reverse}aside{width:100%;height:48%;border-right:0;border-top:1px solid var(--line)}#mapwrap{flex:none;height:52%}}
+</style></head><body>
+<header><div class="logo">F</div><div><h1>Fiber Planner</h1><small>Boundary KMZ in &rarr; fiber plan KMZ out</small></div></header>
+<main>
+<aside>
+<section><h2><b>1</b>Boundary</h2>
+ <div class="row"><label class="btn" for="fb">Upload boundary KMZ / KML</label><input id="fb" type="file" accept=".kmz,.kml"></div>
+ <div class="msg" id="mb">Upload the file that holds your mapped boundary polygon.</div></section>
+<section><h2><b>2</b>Roads &amp; buildings</h2>
+ <div class="row"><button id="bfetch" disabled>Fetch from OpenStreetMap</button><button class="sec" id="bcancel" style="display:none">Cancel</button></div>
+ <div class="msg" id="mf">Pulls every building and road inside the boundary. Needs an internet connection.</div>
+ <details style="margin-top:8px"><summary>Edit homes on the map</summary>
+  <div class="row" style="margin:8px 0"><button class="sec" id="madd">+ Add home</button><button class="sec" id="mdel">&minus; Remove home</button><select id="mkind" style="width:auto"><option value="sdu">Single home</option><option value="mdu">Multi-unit (6)</option><option value="biz">Business / church</option></select></div>
+  <div class="row"><label class="btn sec" for="fh" style="border:1px solid var(--line);background:transparent;color:var(--tx)">Import home points (KMZ/KML)</label><input id="fh" type="file" accept=".kmz,.kml"></div>
+  <div class="msg" id="me">Click the map in Add mode to drop a home; click a home in Remove mode to delete it.</div></details></section>
+<section><h2><b>3</b>Rules</h2>
+ <label class="f">Max pole span (m)<input type="number" id="o_poleMax" value="60" min="30" max="60"></label>
+ <label class="f">Max lines per hub<input type="number" id="o_hubLinesMax" value="6" min="1" max="6"></label>
+ <label class="f">Max hubs per XBOX<input type="number" id="o_xboxHubsMax" value="4" min="1" max="4"></label>
+ <label class="f">Max boxes per line<input type="number" id="o_lineBoxesMax" value="4" min="1" max="4"></label>
+ <label class="f">Homes per subbox (max)<input type="number" id="o_boxHP" value="10" min="4" max="10"></label>
+ <label class="f">Box spacing min (m)<input type="number" id="o_boxSpacingMin" value="100"></label>
+ <label class="f">Box spacing max (m)<input type="number" id="o_boxSpacingMax" value="200"></label>
+ <label class="f">Target homes per hub<input type="number" id="o_hubHPTarget" value="170" min="40"></label>
+ <div class="row" style="margin-top:8px"><button id="bgen" disabled>Generate plan</button></div>
+ <div class="msg" id="mg"></div></section>
+<section id="res" style="display:none"><h2><b>4</b>Result</h2>
+ <div class="tiles" id="tiles"></div>
+ <div style="margin:10px 0 4px;color:var(--mut);font-size:12px">Rule checks</div><div id="checks"></div>
+ <div style="margin:10px 0 4px;color:var(--mut);font-size:12px">Hubs (tap a row to zoom)</div>
+ <table><thead><tr><th>Hub</th><th>XBOX</th><th>Lines</th><th>Boxes</th><th>HP</th></tr></thead><tbody id="hubs"></tbody></table>
+ <div class="row" style="margin-top:12px"><button id="dkmz">Download KMZ</button><button class="sec" id="dcsv">Homepass CSV</button></div></section>
+<div class="msg" style="padding:0 4px">Imagery &copy; Esri, Maxar, Earthstar Geographics &middot; Roads &amp; buildings &copy; OpenStreetMap contributors. Home types and counts are estimates from building size &mdash; review before build-out.</div>
+</aside>
+<div id="mapwrap"><canvas id="cv"></canvas>
+ <div class="banner" id="banner">Satellite tiles are not loading &mdash; check your connection.</div>
+ <div class="tools"><div class="zoom"><button class="sec" id="zi" style="background:#0f1a1e">+</button><button class="sec" id="zo" style="background:#0f1a1e">&minus;</button></div>
+  <div class="box"><label><input type="checkbox" data-l="sat" checked>Satellite</label><label><input type="checkbox" data-l="labels" checked>Road names</label><label><input type="checkbox" data-l="bld" checked>Buildings</label><label><input type="checkbox" data-l="roads">OSM roads</label><label><input type="checkbox" data-l="lines" checked>Fiber lines</label><label><input type="checkbox" data-l="poles" checked>Poles</label><label><input type="checkbox" data-l="plabels" checked>Pole labels</label><label><input type="checkbox" data-l="boxes" checked>Boxes</label></div></div>
+ <div class="hud" id="hud">&nbsp;</div>
+ <div class="busy" id="busy"><div><div class="spin"></div><span id="busytx">Working&hellip;</span></div></div></div>
+</main>
+<script>
+const ZipX = (function () {
+'use strict';
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+const enc = new TextEncoder();
+async function pipe(u8, stream) {
+  const s = new Blob([u8]).stream().pipeThrough(stream);
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+async function inflateRaw(u8) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unzip files (DecompressionStream missing). Use a current Chrome, Edge, Firefox or Safari.');
+  return pipe(u8, new DecompressionStream('deflate-raw'));
+}
+async function deflateRaw(u8) {
+  if (typeof CompressionStream === 'undefined') return null;
+  return pipe(u8, new CompressionStream('deflate-raw'));
+}
+/* read: returns entries [{nameBytes,name,flags,method,time,date,crc,csize,usize,comp}] */
+function readZip(buf) {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let e = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('Not a valid KMZ/ZIP file (end of central directory not found).');
+  const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const out = [], dec = new TextDecoder('utf-8');
+  for (let i = 0; i < n; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('Corrupt ZIP central directory.');
+    const flags = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true), time = dv.getUint16(p + 12, true), date = dv.getUint16(p + 14, true);
+    const crc = dv.getUint32(p + 16, true), csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true);
+    const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const nameBytes = u8.slice(p + 46, p + 46 + nl);
+    const lnl = dv.getUint16(off + 26, true), lxl = dv.getUint16(off + 28, true);
+    const ds = off + 30 + lnl + lxl;
+    out.push({ nameBytes, name: dec.decode(nameBytes), flags, method, time, date, crc, csize, usize, comp: u8.subarray(ds, ds + csize) });
+    p += 46 + nl + xl + cl;
+  }
+  return out;
+}
+async function entryData(en) {
+  if (en.method === 0) return en.comp.slice();
+  if (en.method === 8) return inflateRaw(en.comp);
+  throw new Error('Unsupported ZIP compression method ' + en.method + ' for ' + en.name);
+}
+/* write: items = [{nameBytes|name, data? (Uint8Array, will be compressed), raw? (entry copied as is), compress:bool}] */
+async function writeZip(items) {
+  const parts = [], central = []; let off = 0;
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  for (const it of items) {
+    let nameBytes, flags, method, crc, csize, usize, comp, time, date;
+    if (it.raw) {
+      const r = it.raw; nameBytes = r.nameBytes; flags = r.flags & ~8; method = r.method; crc = r.crc; csize = r.csize; usize = r.usize; comp = r.comp; time = r.time; date = r.date;
+    } else {
+      nameBytes = it.nameBytes || enc.encode(it.name); flags = 0x0800; time = dosTime; date = dosDate;
+      crc = crc32(it.data); usize = it.data.length;
+      let d = it.compress === false ? null : await deflateRaw(it.data);
+      if (d && d.length < usize) { method = 8; comp = d; } else { method = 0; comp = it.data; }
+      csize = comp.length;
+    }
+    const lh = new Uint8Array(30 + nameBytes.length), v = new DataView(lh.buffer);
+    v.setUint32(0, 0x04034b50, true); v.setUint16(4, 20, true); v.setUint16(6, flags, true); v.setUint16(8, method, true);
+    v.setUint16(10, time, true); v.setUint16(12, date, true); v.setUint32(14, crc, true); v.setUint32(18, csize, true); v.setUint32(22, usize, true);
+    v.setUint16(26, nameBytes.length, true); v.setUint16(28, 0, true); lh.set(nameBytes, 30);
+    parts.push(lh, comp);
+    const ch = new Uint8Array(46 + nameBytes.length), c = new DataView(ch.buffer);
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, flags, true); c.setUint16(10, method, true);
+    c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true); c.setUint32(20, csize, true); c.setUint32(24, usize, true);
+    c.setUint16(28, nameBytes.length, true); c.setUint32(42, off, true); ch.set(nameBytes, 46);
+    central.push(ch);
+    off += lh.length + comp.length;
+  }
+  let csz = 0; for (const c of central) csz += c.length;
+  const eo = new Uint8Array(22), e = new DataView(eo.buffer);
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, items.length, true); e.setUint16(10, items.length, true); e.setUint32(12, csz, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, eo], { type: 'application/zip' });
+}
+return { readZip, entryData, writeZip, crc32, enc };
+
+})();
+</script><script>
+/* Fiber Planner engine. Pure JavaScript, no dependencies, runs in a browser or in Node.
+   Input: boundary (lon/lat rings), buildings and roads (lon/lat). Output: a complete plan. */
+const FP = (function () {
+"use strict";
+
+const DEF = {
+  poleMax: 59.5,        // never exceed 60 m between poles (labels are rounded, so 59.5)
+  polePref: 55,         // spacing the planner aims for
+  poleMinSnap: 40,      // smallest spacing used when sliding a pole to a gap between homes
+  passRadius: 45,       // a home is "passed" when a pole is closer than this
+  spurStop: 25,         // a spur ends this close to the home it was built for
+  hubLinesMax: 6, xboxHubsMax: 4, lineBoxesMax: 4, boxHP: 10,
+  hubHPTarget: 170,     // homes per hub the planner aims for
+  boxSpacingMin: 100, boxSpacingMax: 200,
+  minArea: 15,          // buildings smaller than this are ignored
+  roadBuffer: 20        // roads this far outside the boundary are still used
+};
+
+/* ------------------------------------------------------------------ geometry helpers */
+function makeProj(lon0, lat0) {
+  const R = 6371008.8, kx = Math.cos(lat0 * Math.PI / 180) * R * Math.PI / 180, ky = R * Math.PI / 180;
+  return { fwd: (lon, lat) => [(lon - lon0) * kx, (lat - lat0) * ky], inv: (x, y) => [lon0 + x / kx, lat0 + y / ky] };
+}
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function inRing(x, y, ring) {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j];
+    if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c;
+  }
+  return c;
+}
+function distSeg(px, py, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  let t = l2 ? ((px - a[0]) * dx + (py - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+}
+function ringArea(r) { let s = 0; for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
+function ringCentroid(r) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length], f = p[0] * q[1] - q[0] * p[1]; a += f; cx += (p[0] + q[0]) * f; cy += (p[1] + q[1]) * f; }
+  if (Math.abs(a) < 1e-9) { let sx = 0, sy = 0; for (const p of r) { sx += p[0]; sy += p[1]; } return [sx / r.length, sy / r.length]; }
+  return [cx / (3 * a), cy / (3 * a)];
+}
+class Grid { /* spatial hash of points */
+  constructor(cell) { this.c = cell; this.m = new Map(); }
+  key(x, y) { return Math.floor(x / this.c) + "," + Math.floor(y / this.c); }
+  add(id, x, y) { const k = this.key(x, y); let a = this.m.get(k); if (!a) this.m.set(k, a = []); a.push(id); }
+  nearest(x, y, pts, maxR) {
+    const cx = Math.floor(x / this.c), cy = Math.floor(y / this.c); let best = -1, bd = Infinity;
+    const R = Math.ceil((maxR || 1e9) / this.c), lim = Math.min(R, 400);
+    for (let r = 0; r <= lim; r++) {
+      for (let i = cx - r; i <= cx + r; i++) for (let j = cy - r; j <= cy + r; j++) {
+        if (r > 0 && Math.abs(i - cx) !== r && Math.abs(j - cy) !== r) continue;
+        const a = this.m.get(i + "," + j); if (!a) continue;
+        for (const id of a) { const d = Math.hypot(pts[id].x - x, pts[id].y - y); if (d < bd) { bd = d; best = id; } }
+      }
+      if (best >= 0 && bd <= r * this.c) break;
+    }
+    return best >= 0 ? { id: best, d: bd } : null;
+  }
+}
+class Heap { /* binary min-heap of [key, value] */
+  constructor() { this.a = []; }
+  push(k, v) { const a = this.a; a.push([k, v]); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p][0] <= a[i][0]) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }
+  pop() { const a = this.a, t = a[0], l = a.pop(); if (a.length) { a[0] = l; let i = 0; for (;;) { let m = i; const L = 2 * i + 1, R = L + 1; if (L < a.length && a[L][0] < a[m][0]) m = L; if (R < a.length && a[R][0] < a[m][0]) m = R; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return t; }
+  get size() { return this.a.length; }
+}
+
+/* ------------------------------------------------------------------ buildings -> homes (HomePass naming) */
+const SKIP_B = /^(shed|roof|garage|garages|carport|service|toilets|container|hut|cabin|greenhouse|farm_auxiliary|barn|stable|ruins|transformer_tower|kiosk|bunker|boathouse|allotment_house|silo|storage_tank|tent|bridge|digester|parking|sty|cowshed|stable)$/i;
+function safeName(s) { return String(s || "").replace(/[<>&"]/g, "").replace(/\s+/g, " ").trim().slice(0, 40); }
+function classify(b) {
+  const t = b.tags || {}, bt = String(t.building || b.kind || "yes").toLowerCase(), area = b.area || 60;
+  if (SKIP_B.test(bt) || area < DEF.minArea) return null;
+  const levels = parseInt(t["building:levels"] || b.levels || "1", 10) || 1;
+  const uc = /^(construction)$/i.test(bt) || t.construction || t["disused:building"] ? "_UC" : "";
+  const biz = t.shop || t.office || t.craft || /^(commercial|retail|industrial|warehouse|office|hotel|supermarket|kiosk|church|chapel|mosque|cathedral|school|kindergarten|university|college|hospital|clinic|civic|public|religious)$/i.test(bt) || t.amenity;
+  if (biz) {
+    const nm = safeName(t.name) || (t.amenity === "place_of_worship" || /church|chapel|mosque|cathedral|religious/i.test(bt) ? "Church" : t.amenity ? t.amenity : "");
+    return { units: 1, name: "SDU_1-B" + (nm ? "-" + nm : "") + uc, kind: "business" };
+  }
+  if (levels >= 3 || /^(apartments|dormitory|residential_tower)$/i.test(bt)) {
+    const M = Math.max(2, Math.min(levels, 9)), N = Math.max(2, Math.round(area * M / 55));
+    return { units: N, name: N + "-HR-" + M + "F" + uc, kind: "hr" };
+  }
+  if (area >= 280 || levels === 2 && area >= 170) {
+    const N = Math.max(2, Math.min(12, Math.round(area * levels / 75)));
+    return { units: N, name: "MDU-" + N + uc, kind: "mdu" };
+  }
+  return { units: 1, name: "SDU-1" + uc, kind: "sdu" };
+}
+
+/* ------------------------------------------------------------------ road network -> poles */
+function buildRoadGraph(roads, P, inside, boundaryRings, opts) {
+  /* nodes keyed by OSM id when given, otherwise by coordinates rounded to 0.3 m */
+  const nodes = [], keyMap = new Map();
+  const nodeOf = (x, y, id) => {
+    const key = id != null ? "n" + id : Math.round(x / 0.3) + "_" + Math.round(y / 0.3);
+    let i = keyMap.get(key);
+    if (i === undefined) { i = nodes.length; nodes.push({ x, y, adj: new Set() }); keyMap.set(key, i); }
+    return i;
+  };
+  const distB = (x, y) => { let d = Infinity; for (const r of boundaryRings) for (let i = 0; i < r.length; i++) d = Math.min(d, distSeg(x, y, r[i], r[(i + 1) % r.length])); return d; };
+  const near = (x, y) => inside(x, y) || distB(x, y) <= opts.roadBuffer;
+  for (const rd of roads) {
+    const pts = rd.pts.map(q => P.fwd(q[0], q[1]));
+    // densify so that clipping to the boundary is precise, keep every original vertex
+    const seq = [];
+    for (let i = 0; i < pts.length; i++) {
+      seq.push({ x: pts[i][0], y: pts[i][1], id: rd.ids ? rd.ids[i] : null });
+      if (i + 1 < pts.length) { const d = dist(pts[i], pts[i + 1]), n = Math.floor(d / 12); for (let k = 1; k <= n; k++) { const t = k / (n + 1); seq.push({ x: pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, y: pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t, id: null }); } }
+    }
+    let prev = -1;
+    for (const q of seq) {
+      if (!near(q.x, q.y)) { prev = -1; continue; }
+      const n = nodeOf(q.x, q.y, q.id);
+      if (prev >= 0 && prev !== n) { nodes[prev].adj.add(n); nodes[n].adj.add(prev); }
+      prev = n;
+    }
+  }
+  return nodes;
+}
+
+/* turn the road graph into poles: junction poles plus intermediate poles on every road edge */
+function polesFromRoads(nodes, homes, opts) {
+  const poles = []; // {x,y,adj:[{to,d}],src}
+  const junc = new Map(); // road node -> pole index
+  const addPole = (x, y, src) => { poles.push({ x, y, adj: [], src }); return poles.length - 1; };
+  const link = (a, b) => { if (a === b) return; const d = Math.hypot(poles[a].x - poles[b].x, poles[a].y - poles[b].y); if (poles[a].adj.some(e => e.to === b)) return; poles[a].adj.push({ to: b, d }); poles[b].adj.push({ to: a, d }); };
+  const isJ = i => nodes[i].adj.size !== 2;
+  const poleOfJ = i => { let p = junc.get(i); if (p === undefined) { p = addPole(nodes[i].x, nodes[i].y, "road"); junc.set(i, p); } return p; };
+  const visited = new Set(); // directed edge keys
+  const homeGrid = new Grid(40); homes.forEach((h, i) => homeGrid.add(i, h.x, h.y));
+  const clearance = (x, y) => { // distance to nearest home centre (bigger = better gap between homes)
+    const r = homeGrid.nearest(x, y, homes, 40); return r ? r.d : 40;
+  };
+  function walk(start, next) {
+    // follow degree-2 chain from junction `start` through `next` until the next junction
+    const chain = [start, next]; let a = start, b = next;
+    while (!isJ(b) && b !== start) {
+      let n = null; for (const c of nodes[b].adj) if (c !== a) { n = c; break; }
+      if (n === null) break; chain.push(n); a = b; b = n;
+      if (chain.length > 100000) break;
+    }
+    return chain;
+  }
+  const markEdge = (a, b) => visited.add(a + ">" + b);
+  const doChain = chain => {
+    const A = chain[0], B = chain[chain.length - 1];
+    markEdge(chain[0], chain[1]); markEdge(chain[chain.length - 1], chain[chain.length - 2]);
+    const pa = poleOfJ(A), pb = isJ(B) || B === A ? poleOfJ(B) : poleOfJ(B);
+    // arc length along the chain
+    const cum = [0];
+    for (let i = 1; i < chain.length; i++) cum.push(cum[i - 1] + Math.hypot(nodes[chain[i]].x - nodes[chain[i - 1]].x, nodes[chain[i]].y - nodes[chain[i - 1]].y));
+    const L = cum[cum.length - 1];
+    const at = s => { // point at arc length s
+      let i = 1; while (i < cum.length - 1 && cum[i] < s) i++;
+      const t = (s - cum[i - 1]) / Math.max(1e-9, cum[i] - cum[i - 1]);
+      return [nodes[chain[i - 1]].x + (nodes[chain[i]].x - nodes[chain[i - 1]].x) * t, nodes[chain[i - 1]].y + (nodes[chain[i]].y - nodes[chain[i - 1]].y) * t];
+    };
+    if (L < 0.5 && pa === pb) return;
+    const n = Math.max(1, Math.ceil(L / opts.poleMax));
+    let last = pa, sLast = 0;
+    for (let k = 1; k < n; k++) {
+      const nominal = L * k / n, remain = n - k;
+      // slide the pole (within limits) towards the best gap between two homes
+      const lo = Math.max(sLast + opts.poleMinSnap * 0.6, L - remain * opts.poleMax, nominal - 7);
+      const hi = Math.min(sLast + opts.poleMax, nominal + 7, L - remain * 5);
+      let best = nominal, bs = -1;
+      if (lo <= hi) for (let s = lo; s <= hi + 1e-6; s += 1.5) { const p = at(s), sc = clearance(p[0], p[1]) - Math.abs(s - nominal) * 0.15; if (sc > bs) { bs = sc; best = s; } }
+      else best = Math.min(Math.max(nominal, sLast + 1), sLast + opts.poleMax);
+      const p = at(best), idx = addPole(p[0], p[1], "road");
+      link(last, idx); last = idx; sLast = best;
+    }
+    link(last, pb);
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    if (!isJ(i)) continue;
+    for (const nb of nodes[i].adj) { if (visited.has(i + ">" + nb)) continue; doChain(walk(i, nb)); }
+  }
+  // pure cycles (every node has degree 2) have no junction: break them at one node
+  for (let i = 0; i < nodes.length; i++) {
+    if (isJ(i)) continue;
+    for (const nb of nodes[i].adj) { if (visited.has(i + ">" + nb)) continue; const ch = walk(i, nb); if (ch[ch.length - 1] === i) { junc.set(i, junc.get(i)); doChain(ch); } }
+  }
+  return poles;
+}
+
+/* ------------------------------------------------------------------ shortest paths */
+function dijkstra(poles, src) {
+  const n = poles.length, d = new Float64Array(n).fill(Infinity), par = new Int32Array(n).fill(-1), order = [];
+  const h = new Heap(); d[src] = 0; h.push(0, src);
+  const done = new Uint8Array(n);
+  while (h.size) {
+    const [k, u] = h.pop(); if (done[u]) continue; done[u] = 1; order.push(u);
+    for (const e of poles[u].adj) { const nd = k + e.d; if (nd < d[e.to] - 1e-9) { d[e.to] = nd; par[e.to] = u; h.push(nd, e.to); } }
+  }
+  return { d, par, order };
+}
+
+/* ------------------------------------------------------------------ the planner */
+function plan(input, userOpts) {
+  const opts = Object.assign({}, DEF, userOpts || {});
+  const log = [];
+  const rings = input.boundary.filter(r => r.length >= 3);
+  if (!rings.length) throw new Error("The boundary has no polygon.");
+  let sx = 0, sy = 0, sn = 0; for (const r of rings) for (const p of r) { sx += p[0]; sy += p[1]; sn++; }
+  const P = makeProj(sx / sn, sy / sn);
+  const bm = rings.map(r => r.map(p => P.fwd(p[0], p[1])));
+  const inside = (x, y) => bm.some(r => inRing(x, y, r));
+  const areaM2 = bm.reduce((s, r) => s + Math.abs(ringArea(r)), 0);
+
+  /* homes */
+  const homes = [];
+  for (const b of input.buildings || []) {
+    const c = b.poly && b.poly.length >= 3 ? ringCentroid(b.poly.map(p => P.fwd(p[0], p[1]))) : P.fwd(b.lon, b.lat);
+    if (!inside(c[0], c[1])) continue;
+    const k = classify(b); if (!k) continue;
+    const ll = P.inv(c[0], c[1]);
+    homes.push({ id: homes.length, x: c[0], y: c[1], lon: ll[0], lat: ll[1], units: k.units, name: b.name || k.name, kind: k.kind, srcId: b.id });
+  }
+  if (!homes.length) throw new Error("No homes were found inside the boundary.");
+  const totalHP = homes.reduce((s, h) => s + h.units, 0);
+  log.push(homes.length + " buildings inside the boundary, " + totalHP + " homes to pass");
+
+  /* poles from roads */
+  let poles = [];
+  const nodes = buildRoadGraph(input.roads || [], P, inside, bm, opts);
+  poles = polesFromRoads(nodes, homes, opts);
+  log.push((input.roads || []).length + " road segments gave " + poles.length + " poles");
+  const link = (a, b) => { const d = Math.hypot(poles[a].x - poles[b].x, poles[a].y - poles[b].y); poles[a].adj.push({ to: b, d }); poles[b].adj.push({ to: a, d }); };
+  const grid = new Grid(60); poles.forEach((p, i) => grid.add(i, p.x, p.y));
+  const addPole = (x, y, src) => { poles.push({ x, y, adj: [], src }); const i = poles.length - 1; grid.add(i, x, y); return i; };
+  const spur = (from, tx, ty, stop, src) => {
+    const p0 = poles[from], D = Math.hypot(tx - p0.x, ty - p0.y), Ls = D - stop;
+    if (Ls <= 1) return from;
+    const m = Math.ceil(Ls / opts.poleMax), st = Ls / m; let prev = from;
+    for (let i = 1; i <= m; i++) { const f = st * i / D, q = addPole(p0.x + (tx - p0.x) * f, p0.y + (ty - p0.y) * f, src); link(prev, q); prev = q; }
+    return prev;
+  };
+  /* homes that no pole passes get a spur of poles built towards them */
+  let spurs = 0;
+  if (!poles.length) { // no roads at all: start from the home nearest the middle
+    let c = homes[0], bd = 1e18; for (const h of homes) { const d = Math.hypot(h.x, h.y); if (d < bd) { bd = d; c = h; } }
+    addPole(c.x, c.y, "seed");
+  }
+  const need = homes.map(h => ({ h, d: (grid.nearest(h.x, h.y, poles) || { d: 1e9 }).d })).filter(o => o.d > opts.passRadius).sort((a, b) => a.d - b.d);
+  for (const o of need) {
+    const nn = grid.nearest(o.h.x, o.h.y, poles);
+    if (nn.d > opts.passRadius) { spur(nn.id, o.h.x, o.h.y, opts.spurStop, "spur"); spurs++; }
+  }
+  /* connect separate pieces of the network that serve homes */
+  let comp = new Int32Array(poles.length).fill(-1); let nc = 0;
+  const compOf = () => { if (comp.length !== poles.length) comp = new Int32Array(poles.length); comp.fill(-1); nc = 0; for (let i = 0; i < poles.length; i++) { if (comp[i] >= 0) continue; const st = [i]; comp[i] = nc; while (st.length) { const u = st.pop(); for (const e of poles[u].adj) if (comp[e.to] < 0) { comp[e.to] = nc; st.push(e.to); } } nc++; } };
+  compOf();
+  const tapOf = homes.map(h => grid.nearest(h.x, h.y, poles).id);
+  const compHP = new Float64Array(nc); homes.forEach((h, i) => compHP[comp[tapOf[i]]] += h.units);
+  let main = 0; for (let c = 1; c < nc; c++) if (compHP[c] > compHP[main]) main = c;
+  let bridges = 0;
+  for (;;) {
+    compOf();
+    const hp = new Float64Array(nc); homes.forEach((h, i) => hp[comp[tapOf[i]]] += h.units);
+    let mc = 0; for (let c = 1; c < nc; c++) if (hp[c] > hp[mc]) mc = c;
+    const others = []; for (let c = 0; c < nc; c++) if (c !== mc && hp[c] > 0) others.push(c);
+    if (!others.length) break;
+    const mg = new Grid(60); poles.forEach((p, i) => { if (comp[i] === mc) mg.add(i, p.x, p.y); });
+    let bestD = Infinity, bi = -1, bj = -1;
+    for (let i = 0; i < poles.length; i++) { if (comp[i] !== others[0]) continue; const nn = mg.nearest(poles[i].x, poles[i].y, poles); if (nn && nn.d < bestD) { bestD = nn.d; bi = i; bj = nn.id; } }
+    if (bi < 0) break;
+    const last = spur(bj, poles[bi].x, poles[bi].y, 0, "bridge");
+    if (last === bj) link(bj, bi); else link(last, bi);
+    bridges++; if (bridges > 4000) break;
+  }
+  compOf();  log.push(spurs + " spur(s) added to reach homes away from mapped roads" + (bridges ? ", " + bridges + " link(s) to join separate road pieces" : ""));
+  grid.m.clear(); poles.forEach((p, i) => grid.add(i, p.x, p.y));
+  const tap = homes.map(h => grid.nearest(h.x, h.y, poles));
+  homes.forEach((h, i) => { h.pole = tap[i].id; h.tapDist = tap[i].d; });
+
+  /* ---------------- hubs: weighted k-means seeding then balanced network assignment */
+  const polesInMain = (() => { compOf(); const hp = new Float64Array(nc); homes.forEach(h => hp[comp[h.pole]] += h.units); let m = 0; for (let c = 1; c < nc; c++) if (hp[c] > hp[m]) m = c; return m; })();
+  const homeW = homes.map(h => h.units);
+  const hubCap = opts.hubLinesMax * opts.lineBoxesMax * opts.boxHP;
+  let result = null, lastErr = "";
+  const kStart = Math.max(1, Math.ceil(totalHP / opts.hubHPTarget));
+  for (let k = kStart; k <= kStart + 12 && k <= homes.length; k++) {
+    const r = tryK(k);
+    if (r.ok) { result = r; break; }
+    lastErr = r.err; log.push("With " + k + " hubs: " + r.err + " – trying " + (k + 1));
+  }
+  if (!result) throw new Error("Could not satisfy the rules: " + lastErr);
+  return finish(result);
+
+  function seedHubs(k) {
+    const cx = homes.reduce((s, h) => s + h.x * h.units, 0) / totalHP, cy = homes.reduce((s, h) => s + h.y * h.units, 0) / totalHP;
+    let c = [homes.reduce((b, h) => Math.hypot(h.x - cx, h.y - cy) < Math.hypot(b.x - cx, b.y - cy) ? h : b)].map(h => [h.x, h.y]);
+    // farthest-point seeding gives a uniform spread over the whole boundary
+    while (c.length < k) { let bh = null, bd = -1; for (const h of homes) { const d = Math.min(...c.map(q => Math.hypot(h.x - q[0], h.y - q[1]))); if (d > bd) { bd = d; bh = h; } } c.push([bh.x, bh.y]); }
+    for (let it = 0; it < 8; it++) {
+      const sum = c.map(() => [0, 0, 0]);
+      for (const h of homes) { let bi = 0, bd = Infinity; c.forEach((q, i) => { const d = Math.hypot(h.x - q[0], h.y - q[1]); if (d < bd) { bd = d; bi = i; } }); sum[bi][0] += h.x * h.units; sum[bi][1] += h.y * h.units; sum[bi][2] += h.units; }
+      c = c.map((q, i) => sum[i][2] ? [sum[i][0] / sum[i][2], sum[i][1] / sum[i][2]] : q);
+    }
+    return c;
+  }
+  function nearestPoleInMain(x, y) {
+    let best = -1, bd = Infinity;
+    for (let i = 0; i < poles.length; i++) { if (comp[i] !== polesInMain) continue; const d = Math.hypot(poles[i].x - x, poles[i].y - y); if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  function tryK(k) {
+    let centers = seedHubs(k), hubPole = centers.map(c => nearestPoleInMain(c[0], c[1]));
+    const cap = Math.min(hubCap, Math.ceil(totalHP / k * 1.02) + 2);
+    let assign = null, dj = null;
+    for (let iter = 0; iter < 5; iter++) {
+      // make sure two hubs never start on the same pole
+      const used = new Set(); hubPole = hubPole.map((p, i) => { if (!used.has(p)) { used.add(p); return p; } let bp = p, bd = Infinity; for (let q = 0; q < poles.length; q++) { if (comp[q] !== polesInMain || used.has(q)) continue; const d = Math.hypot(poles[q].x - poles[p].x, poles[q].y - poles[p].y); if (d < bd) { bd = d; bp = q; } } used.add(bp); return bp; });
+      dj = hubPole.map(p => dijkstra(poles, p));
+      const order = homes.map((h, i) => ({ i, d: Math.min(...dj.map(x => x.d[h.pole])) })).sort((a, b) => a.d - b.d);
+      const load = new Array(k).fill(0); assign = new Array(homes.length).fill(-1);
+      // homes with the fewest alternatives choose first: sort by regret (second best minus best)
+      const reg = homes.map((h, i) => { const ds = dj.map(x => x.d[h.pole]).sort((a, b) => a - b); return { i, r: (ds[1] === undefined ? 1e9 : ds[1]) - ds[0] }; }).sort((a, b) => b.r - a.r);
+      for (const o of reg) {
+        const h = homes[o.i]; const prefs = dj.map((x, hi) => ({ hi, d: x.d[h.pole] })).sort((a, b) => a.d - b.d);
+        let ch = prefs.find(p => p.d < Infinity && load[p.hi] + h.units <= cap);
+        if (!ch) ch = prefs.find(p => p.d < Infinity) || prefs[0];
+        assign[o.i] = ch.hi; load[ch.hi] += h.units;
+      }
+      // move each hub to the centre of its homes
+      let moved = false;
+      hubPole = hubPole.map((p, hi) => {
+        let sx2 = 0, sy2 = 0, sw = 0; homes.forEach((h, i) => { if (assign[i] === hi) { sx2 += h.x * h.units; sy2 += h.y * h.units; sw += h.units; } });
+        if (!sw) return p; const np = nearestPoleInMain(sx2 / sw, sy2 / sw); if (np !== p) moved = true; return np;
+      });
+      if (!moved) break;
+    }
+    dj = hubPole.map(p => dijkstra(poles, p));
+    const hubs = [];
+    for (let hi = 0; hi < k; hi++) {
+      const items = homes.filter((h, i) => assign[i] === hi);
+      if (!items.length) return { ok: false, err: "a hub ended up with no homes" };
+      const r = buildHub(hi, hubPole[hi], dj[hi], items);
+      if (!r.ok) return { ok: false, err: "hub " + (hi + 1) + " " + r.err };
+      hubs.push(r.hub);
+    }
+    return { ok: true, hubs, hubPole, dj, k };
+  }
+
+  /* ---------------- one hub: shortest-path tree, split into lines, split lines into subbox groups */
+  function buildHub(hi, hp, dj, items) {
+    const par = dj.par, d = dj.d;
+    if (items.some(h => d[h.pole] === Infinity)) return { ok: false, err: "has homes that no pole route reaches" };
+    const children = new Map();
+    const need = new Set();
+    for (const h of items) { let u = h.pole; while (u !== -1 && !need.has(u)) { need.add(u); u = par[u]; } }
+    for (const u of need) { const p = par[u]; if (p >= 0) { if (!children.has(p)) children.set(p, []); children.get(p).push(u); } }
+    const tapsAt = new Map(); for (const h of items) { if (!tapsAt.has(h.pole)) tapsAt.set(h.pole, []); tapsAt.get(h.pole).push(h); }
+    // depth-first order, deepest branch last, so lines read outwards
+    const maxd = new Map(); const post = [];
+    (function mk(u) { const st = [[u, 0]]; const seq = []; while (st.length) { const [x, i] = st.pop(); seq.push(x); for (const c of children.get(x) || []) st.push([c, 0]); } for (let i = seq.length - 1; i >= 0; i--) { const x = seq[i]; let m = d[x]; for (const c of children.get(x) || []) m = Math.max(m, maxd.get(c)); maxd.set(x, m); } })(hp);
+    for (const [, ch] of children) ch.sort((a, b) => maxd.get(a) - maxd.get(b) || a - b);
+    const pre = new Map(); const dfsOrder = [];
+    (function dfs(u) { const st = [u]; while (st.length) { const x = st.pop(); pre.set(x, dfsOrder.length); dfsOrder.push(x); const ch = children.get(x) || []; for (let i = ch.length - 1; i >= 0; i--) st.push(ch[i]); } })(hp);
+    const lineCap = opts.lineBoxesMax * opts.boxHP;
+    const W = x => x.reduce((s, h) => s + h.units, 0);
+
+    function partition(T) {
+      const pend = new Map(); const groups = []; const nodesDesc = dfsOrder.slice().reverse();
+      for (const u of nodesDesc) {
+        let list = (tapsAt.get(u) || []).slice(); const sub = [];
+        for (const c of children.get(u) || []) { const pl = pend.get(c); if (pl && pl.length) sub.push(pl); }
+        sub.sort((a, b) => W(b) - W(a));
+        let tot = W(list) + sub.reduce((s, a) => s + W(a), 0);
+        while (tot > lineCap && sub.length) { const big = sub.shift(); groups.push({ root: u, items: big, fromChild: true }); tot -= W(big); }
+        for (const s of sub) list = list.concat(s);
+        if (u !== hp && W(list) >= T) { groups.push({ root: u, items: list }); pend.set(u, []); } else pend.set(u, list);
+      }
+      const rest = pend.get(hp) || [];
+      if (rest.length) groups.push({ root: hp, items: rest });
+      return groups;
+    }
+    const cut = (g) => { // largest chunk count a group would need
+      return chunk(g.items).length;
+    };
+    function chunk(its) {
+      const sorted = its.slice().sort((a, b) => pre.get(a.pole) - pre.get(b.pole) || a.id - b.id);
+      const virt = []; for (const h of sorted) { let w = h.units; while (w > opts.boxHP) { virt.push({ h, w: opts.boxHP }); w -= opts.boxHP; } virt.push({ h, w }); }
+      const ch = []; let cur = [], cw = 0;
+      for (const v of virt) { if (cw + v.w > opts.boxHP && cur.length) { ch.push(cur); cur = []; cw = 0; } cur.push(v); cw += v.w; }
+      if (cur.length) ch.push(cur);
+      return ch;
+    }
+    let groups = null;
+    for (const T of [26, 30, 34, 38, lineCap]) {
+      let g = partition(T);
+      // a group that would need more than 4 boxes is split along the line
+      let ok = true, guard = 0;
+      for (let i = 0; i < g.length && guard < 50; i++) {
+        const ch = chunk(g[i].items);
+        if (ch.length > opts.lineBoxesMax) {
+          const keep = ch.slice(0, opts.lineBoxesMax).flat().map(v => v.h), keepSet = new Set(keep);
+          const tail = g[i].items.filter(h => !keepSet.has(h));
+          if (!tail.length) { ok = false; break; }
+          g[i] = { root: g[i].root, items: g[i].items.filter(h => keepSet.has(h)) }; g.push({ root: g[i].root, items: tail }); guard++;
+        }
+      }
+      if (!ok) continue;
+      // tiny leftover groups are folded into their nearest neighbour
+      for (let again = true; again;) {
+        again = false;
+        for (let i = 0; i < g.length && g.length > 1; i++) {
+          if (W(g[i].items) >= 8) continue;
+          const cx = g[i].items.reduce((s2, h) => s2 + h.x, 0) / g[i].items.length, cy = g[i].items.reduce((s2, h) => s2 + h.y, 0) / g[i].items.length;
+          let bj = -1, bd = Infinity;
+          for (let j = 0; j < g.length; j++) { if (j === i) continue; const m = g[i].items.concat(g[j].items); if (W(m) > lineCap || chunk(m).length > opts.lineBoxesMax) continue; const c2x = g[j].items.reduce((s2, h) => s2 + h.x, 0) / g[j].items.length, c2y = g[j].items.reduce((s2, h) => s2 + h.y, 0) / g[j].items.length; const dd = Math.hypot(cx - c2x, cy - c2y); if (dd < bd) { bd = dd; bj = j; } }
+          if (bj >= 0 && bd < 400) { g[bj] = { root: hp, items: g[bj].items.concat(g[i].items), merged: true }; g.splice(i, 1); again = true; break; }
+        }
+      }
+      // merge neighbours while there are too many lines
+      while (g.length > opts.hubLinesMax) {
+        g.sort((a, b) => W(a.items) - W(b.items));
+        let merged = false;
+        for (let i = 0; i < g.length && !merged; i++) for (let j = i + 1; j < g.length && !merged; j++) {
+          const m = g[i].items.concat(g[j].items);
+          if (W(m) <= lineCap && chunk(m).length <= opts.lineBoxesMax) { g[j] = { root: hp, items: m, merged: true }; g.splice(i, 1); merged = true; }
+        }
+        if (!merged) break;
+      }
+      if (g.length <= opts.hubLinesMax) { groups = g; break; }
+    }
+    if (!groups) return { ok: false, err: "needs more than " + opts.hubLinesMax + " lines" };
+
+    // order the lines clockwise from north around the hub
+    const hx = poles[hp].x, hy = poles[hp].y;
+    groups.forEach(g => { const c = g.items; const cx = c.reduce((s, h) => s + h.x, 0) / c.length, cy = c.reduce((s, h) => s + h.y, 0) / c.length; g.ang = (Math.atan2(cx - hx, cy - hy) + 2 * Math.PI) % (2 * Math.PI); });
+    groups.sort((a, b) => a.ang - b.ang);
+    const lines = groups.map((g, li) => {
+      // the physical route: from the hub to where the group starts, then every pole needed inside the group
+      const own = new Set(); const mine = new Set(g.items.map(h => h.pole));
+      for (const h of g.items) { let u = h.pole; while (u !== -1 && u !== hp) { own.add(u); u = par[u]; } }
+      own.add(hp);
+      // subboxes: as few as the 10-home limit allows, more when the line is long so boxes stay 100-200 m apart
+      const ch = chunk(g.items); const nb = ch.length;
+      const dmax = Math.max(...g.items.map(h => d[h.pole])), dmin = Math.min(...g.items.map(h => d[h.pole]));
+      const extent = dmax - dmin, wTot = W(g.items);
+      const sorted = g.items.slice().sort((a, b) => pre.get(a.pole) - pre.get(b.pole) || a.id - b.id);
+      const tdist = (a, b) => { const up = new Map(); let u = a; while (u !== -1) { up.set(u, true); u = par[u]; } u = b; while (u !== -1 && !up.has(u)) u = par[u]; return (d[a] - d[u]) + (d[b] - d[u]); };
+      const mkBoxes = parts => {
+        const bx = parts.map(part => {
+          const hs = [...new Set(part.map(v => v.h))];
+          const tw = hs.reduce((s2, h) => s2 + h.units, 0), cx = hs.reduce((s2, h) => s2 + h.x * h.units, 0) / tw, cy = hs.reduce((s2, h) => s2 + h.y * h.units, 0) / tw;
+          let bp = hs[0].pole, bd = Infinity; for (const h of hs) { const q = poles[h.pole], dd = Math.hypot(q.x - cx, q.y - cy); if (dd < bd) { bd = dd; bp = h.pole; } }
+          return { pole: bp, homes: hs, hp: part.reduce((s2, v) => s2 + v.w, 0) };
+        });
+        bx.sort((a, b) => d[a.pole] - d[b.pole] || pre.get(a.pole) - pre.get(b.pole));
+        return bx;
+      };
+      const maxGap = bx => { let m = 0; for (let i = 1; i < bx.length; i++) m = Math.max(m, tdist(bx[i - 1].pole, bx[i].pole)); return m; };
+      const balanced = n => { // n contiguous groups of near-equal home count along the line
+        const bal = []; let cur = [], cw = 0, k2 = 0;
+        for (const h of sorted) { if (k2 < n - 1 && cw >= wTot * (k2 + 1) / n && cur.length) { bal.push(cur); cur = []; k2++; } cur.push({ h, w: h.units }); cw += h.units; }
+        if (cur.length) bal.push(cur); return bal;
+      };
+      let boxes = mkBoxes(ch);
+      for (let n = nb; n <= opts.lineBoxesMax; n++) {
+        const parts = n === nb ? ch : balanced(n);
+        if (parts.length > opts.lineBoxesMax || parts.some(p => p.reduce((s2, v) => s2 + v.w, 0) > opts.boxHP)) continue;
+        const bx = mkBoxes(parts); boxes = bx;
+        if (maxGap(bx) <= opts.boxSpacingMax + 5) break;
+      }
+      return { n: li + 1, root: g.root, poles: own, items: g.items, boxes, hp: wTot, extent };
+    });
+    return { ok: true, hub: { n: hi + 1, pole: hp, par, d, children, pre, lines, items } };
+  }
+
+  /* ---------------- xboxes, feeder, assembling the output */
+  function finish(res) {
+    const { hubs, hubPole } = res;
+    const k = hubs.length, m = Math.ceil(k / opts.xboxHubsMax);
+    // cluster hubs into xbox groups of at most 4
+    let cent = []; { const hs = hubPole.map(p => [poles[p].x, poles[p].y]); let c = [hs[0]]; while (c.length < m) { let bh = null, bd = -1; for (const h of hs) { const dd = Math.min(...c.map(q => Math.hypot(h[0] - q[0], h[1] - q[1]))); if (dd > bd) { bd = dd; bh = h; } } c.push(bh); }
+      let asg = new Array(k).fill(0);
+      for (let it = 0; it < 10; it++) {
+        const load = new Array(m).fill(0); const ord = hs.map((h, i) => ({ i, d: Math.min(...c.map(q => Math.hypot(h[0] - q[0], h[1] - q[1]))) })).sort((a, b) => a.d - b.d);
+        for (const o of ord) { const pr = c.map((q, ci) => ({ ci, d: Math.hypot(hs[o.i][0] - q[0], hs[o.i][1] - q[1]) })).sort((a, b) => a.d - b.d); const ch = pr.find(p => load[p.ci] < opts.xboxHubsMax); asg[o.i] = ch.ci; load[ch.ci]++; }
+        c = c.map((q, ci) => { const mem = hs.filter((h, i) => asg[i] === ci); return mem.length ? [mem.reduce((s, h) => s + h[0], 0) / mem.length, mem.reduce((s, h) => s + h[1], 0) / mem.length] : q; });
+      }
+      cent = { c, asg }; }
+    const xboxes = [];
+    for (let xi = 0; xi < m; xi++) {
+      const mem = hubs.filter((h, i) => cent.asg[i] === xi); if (!mem.length) continue;
+      const c = cent.c[xi]; let best = -1, bd = Infinity;
+      for (let i = 0; i < poles.length; i++) { if (comp[i] !== polesInMain) continue; const dd = Math.hypot(poles[i].x - c[0], poles[i].y - c[1]); if (dd < bd) { bd = dd; best = i; } }
+      // an xbox shares the pole of the nearest hub when that hub is within one pole span
+      for (const h of mem) { if (Math.hypot(poles[h.pole].x - poles[best].x, poles[h.pole].y - poles[best].y) <= opts.poleMax && bd > 0) { best = h.pole; break; } }
+      xboxes.push({ n: 0, pole: best, hubs: mem });
+    }
+    xboxes.sort((a, b) => (poles[a.pole].x - poles[b.pole].x) || (poles[a.pole].y - poles[b.pole].y));
+    xboxes.forEach((x, i) => x.n = i + 1);
+    for (const x of xboxes) {
+      const dj = dijkstra(poles, x.pole); x.feeders = [];
+      for (const h of x.hubs.slice().sort((a, b) => a.n - b.n)) {
+        const path = []; let u = h.pole; while (u !== -1) { path.push(u); u = dj.par[u]; } path.reverse();
+        x.feeders.push({ hub: h.n, path, len: dj.d[h.pole] });
+      }
+    }
+    hubs.forEach(h => { h.xbox = xboxes.find(x => x.hubs.includes(h)).n; });
+    return assemble({ hubs, xboxes });
+  }
+
+  function assemble(res) {
+    const { hubs, xboxes } = res;
+    const toLL = i => P.inv(poles[i].x, poles[i].y);
+    const out = { hubs: [], xboxes: [], feeder: [], summary: {}, log, opts, boundary: input.boundary, areaM2 };
+    const hubPolesUsed = new Set();
+    for (const h of hubs) {
+      const used = new Set([h.pole]); const hub = { n: h.n, lonlat: toLL(h.pole), pole: h.pole, xbox: h.xbox, lines: [], poles: [], hp: 0 };
+      for (const L of h.lines) {
+        // route polyline: trunk from the hub, then a walk through every pole the line needs
+        const routeSet = new Set(L.poles);
+        const walkOrder = []; const seenEdge = new Set();
+        const st = [[h.pole, 0]]; // iterative DFS that writes the walk including the returns
+        const kids = u => (h.children.get(u) || []).filter(c => routeSet.has(c));
+        const seq = []; (function dfs(u) { seq.push(u); const ks = kids(u); ks.forEach((c, i) => { dfs(c); if (i < ks.length - 1) seq.push(u); }); })(h.pole);
+        let length = 0; for (const u of routeSet) { if (u !== h.pole) length += poles[u].adj.find(e => e.to === h.par[u]).d; }
+        for (const u of routeSet) used.add(u);
+        const homesOut = L.items.slice().sort((a, b) => h.pre.get(a.pole) - h.pre.get(b.pole) || a.id - b.id);
+        const boxes = L.boxes.map((b, bi) => {
+          const sub = { n: bi + 1, name: "H" + h.n + "_S" + L.n + "." + (bi + 1), pole: b.pole, lonlat: toLL(b.pole), hp: b.hp, homes: b.homes };
+          b.homes.forEach(x => { x.hub = h.n; x.line = L.n; x.box = sub.name; });
+          return sub;
+        });
+        // distance between the boxes of a line along the route
+        const tdist = (a, b) => { const up = new Map(); let u = a, dd = 0; while (u !== -1) { up.set(u, h.d[a] - h.d[u]); u = h.par[u]; } u = b; while (u !== -1 && !up.has(u)) u = h.par[u]; return (h.d[a] - h.d[u]) + (h.d[b] - h.d[u]); };
+        const spac = [], spacHP = []; for (let i = 1; i < boxes.length; i++) { spac.push(tdist(boxes[i - 1].pole, boxes[i].pole)); spacHP.push(boxes[i - 1].hp + boxes[i].hp); }
+        hub.lines.push({ n: L.n, name: "Line " + L.n, coords: seq.map(toLL), length, hp: L.hp, boxes, spacing: spac, spacingHP: spacHP, homes: homesOut });
+        hub.hp += L.hp;
+      }
+      // every pole used by this hub with its distance label (straight line to the previous pole)
+      const hp = h.pole;
+      const list = [...used].sort((a, b) => h.pre.get(a) - h.pre.get(b));
+      for (const u of list) {
+        const pu = h.par[u]; const dd = u === hp || pu < 0 ? 0 : Math.hypot(poles[u].x - poles[pu].x, poles[u].y - poles[pu].y);
+        hub.poles.push({ id: u, lonlat: toLL(u), d: dd, label: Math.round(dd) + "m" });
+        hubPolesUsed.add(u);
+      }
+      out.hubs.push(hub);
+    }
+    const feederPoles = new Map();
+    for (const x of xboxes) {
+      const xb = { n: x.n, lonlat: toLL(x.pole), pole: x.pole, hubs: x.hubs.map(h => h.n) };
+      out.xboxes.push(xb);
+      for (const f of x.feeders) {
+        const coords = f.path.map(toLL);
+        out.feeder.push({ name: "XBOX" + x.n + " - HUB" + f.hub, xbox: x.n, hub: f.hub, coords, length: f.len });
+        f.path.forEach((u, i) => { if (hubPolesUsed.has(u) || feederPoles.has(u)) return; const prev = i ? f.path[i - 1] : -1; const dd = prev < 0 ? 0 : Math.hypot(poles[u].x - poles[prev].x, poles[u].y - poles[prev].y); feederPoles.set(u, { id: u, lonlat: toLL(u), d: dd, label: Math.round(dd) + "m" }); });
+      }
+    }
+    out.feederPoles = [...feederPoles.values()];
+    out.homes = homes.map(h => ({ id: h.id, srcId: h.srcId, lonlat: [h.lon, h.lat], name: h.name, units: h.units, kind: h.kind, hub: h.hub, line: h.line, box: h.box, tapDist: h.tapDist }));
+    out.polesAll = poles.map((p, i) => ({ id: i, lonlat: P.inv(p.x, p.y) }));
+    out.validation = validate(out, hubs, xboxes);
+    out.summary = { homes: homes.length, hp: totalHP, hubs: out.hubs.length, xboxes: out.xboxes.length, lines: out.hubs.reduce((s, h) => s + h.lines.length, 0), subboxes: out.hubs.reduce((s, h) => s + h.lines.reduce((t, l) => t + l.boxes.length, 0), 0), poles: out.hubs.reduce((s, h) => s + h.poles.length, 0) + out.feederPoles.length, areaKm2: areaM2 / 1e6 };
+    return out;
+  }
+
+  /* ---------------- independent rule check on the finished plan */
+  function validate(out, hubs, xboxes) {
+    const V = []; const ok = (rule, pass, detail, soft) => V.push({ rule, pass, detail, soft: !!soft });
+    const maxH = Math.max(...out.xboxes.map(x => x.hubs.length));
+    ok("Every XBOX connects to at most " + opts.xboxHubsMax + " hubs", maxH <= opts.xboxHubsMax, "most hubs on one XBOX: " + maxH);
+    const maxL = Math.max(...out.hubs.map(h => h.lines.length));
+    ok("Every hub has at most " + opts.hubLinesMax + " lines", maxL <= opts.hubLinesMax, "most lines on one hub: " + maxL);
+    const maxB = Math.max(...out.hubs.flatMap(h => h.lines.map(l => l.boxes.length)));
+    ok("Every line has at most " + opts.lineBoxesMax + " boxes", maxB <= opts.lineBoxesMax, "most boxes on one line: " + maxB);
+    const maxHP = Math.max(...out.hubs.flatMap(h => h.lines.flatMap(l => l.boxes.map(b => b.hp))));
+    ok("Every subbox serves at most " + opts.boxHP + " homes", maxHP <= opts.boxHP, "most homes on one subbox: " + maxHP);
+    // pole spacing (the straight-line label distance)
+    let worst = 0, over = 0, total = 0, small = 0;
+    for (const h of out.hubs) for (const p of h.poles) { if (p.d > worst) worst = p.d; if (p.d > 60) over++; total++; if (p.d > 0 && p.d < 50) small++; }
+    for (const p of out.feederPoles) { if (p.d > worst) worst = p.d; if (p.d > 60) over++; total++; if (p.d > 0 && p.d < 50) small++; }
+    ok("No pole is more than 60 m from the previous one", over === 0, "longest span: " + worst.toFixed(1) + " m; " + small + " of " + total + " spans are shorter than 50 m (allowed)");
+    const passed = homes.filter(h => h.tapDist <= opts.passRadius + 1).length, assigned = homes.filter(h => h.hub).length;
+    ok("Every home inside the boundary is passed", passed === homes.length && assigned === homes.length, passed + " of " + homes.length + " buildings have a pole within " + opts.passRadius + " m; " + assigned + " are served by a subbox");
+    let sp = 0, spOk = 0; for (const h of out.hubs) for (const l of h.lines) l.spacing.forEach((s, i) => { sp++; if ((s >= opts.boxSpacingMin - 1 && s <= opts.boxSpacingMax + 1) || (s < opts.boxSpacingMin && l.spacingHP[i] > opts.boxHP)) spOk++; });
+    ok("Subboxes on a line are 100–200 m apart (closer only where home count needs it)", sp === 0 || spOk / sp >= 0.8, sp ? spOk + " of " + sp + " gaps are 100–200 m, or closer only because the homes between them need two boxes" : "no line has more than one subbox", true);
+    return V;
+  }
+}
+
+/* ------------------------------------------------------------------ OSM (Overpass) -> input */
+function parseOverpass(json) {
+  const buildings = [], roads = [];
+  const HW = /^(residential|service|unclassified|tertiary|secondary|primary|living_street|track|road|path|footway|pedestrian|tertiary_link|secondary_link|primary_link)$/;
+  for (const e of json.elements || []) {
+    if (e.type !== "way" || !e.geometry || e.geometry.length < 2) continue;
+    const t = e.tags || {};
+    if (t.building) {
+      const g = e.geometry.map(p => [p.lon, p.lat]); if (g.length < 4) continue;
+      const lat0 = g[0][1], kx = Math.cos(lat0 * Math.PI / 180) * 111320, ky = 110574;
+      const m = g.map(p => [p[0] * kx, p[1] * ky]); const area = Math.abs(ringArea(m));
+      const c = ringCentroid(g);
+      buildings.push({ id: "w" + e.id, lon: c[0], lat: c[1], area, tags: t, poly: g });
+    } else if (t.highway && HW.test(t.highway) && !(t.access === "private" && t.highway === "service" && false)) {
+      roads.push({ pts: e.geometry.map(p => [p.lon, p.lat]), ids: e.nodes || null, hw: t.highway });
+    }
+  }
+  return { buildings, roads };
+}
+
+return { plan, parseOverpass, classify, DEF, makeProj };
+})();
+if (typeof module !== "undefined") module.exports = FP;
+
+</script><script>
+/* KML / KMZ output in the same layout and with the same icons as the reference KMZ. */
+const KMLOUT = (function () {
+"use strict";
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const co = ll => ll[0].toFixed(8) + "," + ll[1].toFixed(8) + ",0";
+const ICON = "http://maps.google.com/mapfiles/kml/";
+const LINE_COLORS = ["ff00ffff", "ff00ff00", "ffffaa00", "ff00aaff", "ffff00ff", "ffffffff"];
+
+function styles() {
+  const lab = (c, s) => `<LabelStyle>${c ? "<color>" + c + "</color>" : ""}<scale>${s}</scale></LabelStyle>`;
+  let x = "";
+  x += `<Style id="xbox"><IconStyle><color>ff00ff00</color><scale>0.8</scale><Icon><href>${ICON}shapes/realestate.png</href></Icon><hotSpot x="0.5" y="0" xunits="fraction" yunits="fraction"/></IconStyle>${lab("", 0.8)}</Style>\n`;
+  x += `<Style id="hubbox"><IconStyle><scale>0.8</scale><Icon><href>${ICON}shapes/hospitals.png</href></Icon><hotSpot x="0.5" y="0" xunits="fraction" yunits="fraction"/></IconStyle>${lab("", 0.8)}</Style>\n`;
+  x += `<Style id="subbox"><IconStyle><color>ff00aa00</color><scale>0.8</scale><Icon><href>${ICON}shapes/triangle.png</href></Icon></IconStyle>${lab("", 0.8)}</Style>\n`;
+  x += `<Style id="pole"><IconStyle><scale>0.6</scale><Icon><href>${ICON}shapes/placemark_circle.png</href></Icon></IconStyle>${lab("ffffffff", 0.7)}</Style>\n`;
+  x += `<Style id="home"><IconStyle><color>ff0701fc</color><scale>0.7</scale><Icon><href>${ICON}paddle/red-stars.png</href></Icon><hotSpot x="32" y="1" xunits="pixels" yunits="pixels"/></IconStyle>${lab("ff0affff", 0.8)}<ListStyle><ItemIcon><href>${ICON}paddle/red-stars-lv.png</href></ItemIcon></ListStyle></Style>\n`;
+  x += `<Style id="feeder"><IconStyle><scale>1.1</scale><Icon><href>${ICON}pushpin/ylw-pushpin.png</href></Icon><hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/></IconStyle><LineStyle><color>ff00aaff</color><width>3</width></LineStyle></Style>\n`;
+  LINE_COLORS.forEach((c, i) => { x += `<Style id="line${i + 1}"><IconStyle><scale>1.1</scale><Icon><href>${ICON}pushpin/ylw-pushpin.png</href></Icon><hotSpot x="20" y="2" xunits="pixels" yunits="pixels"/></IconStyle><LineStyle><color>${c}</color><width>3</width></LineStyle></Style>\n`; });
+  x += `<Style id="boundary"><LineStyle><color>ff0000ff</color><width>3</width></LineStyle><PolyStyle><fill>0</fill><outline>1</outline></PolyStyle></Style>\n`;
+  return x;
+}
+const point = (name, ll, style, desc, extra) => `<Placemark><name>${esc(name)}</name>${desc ? "<description>" + esc(desc) + "</description>" : ""}<styleUrl>#${style}</styleUrl><Point><coordinates>${co(ll)}</coordinates></Point></Placemark>\n`;
+const lineStr = (name, coords, style, desc) => `<Placemark><name>${esc(name)}</name>${desc ? "<description>" + esc(desc) + "</description>" : ""}<styleUrl>#${style}</styleUrl><LineString><tessellate>1</tessellate><coordinates>${coords.map(co).join(" ")}</coordinates></LineString></Placemark>\n`;
+const folder = (name, inner, desc) => `<Folder><name>${esc(name)}</name>${desc ? "<description>" + esc(desc) + "</description>" : ""}<open>1</open>\n${inner}</Folder>\n`;
+
+function hpOf(list) { return list.reduce((s, h) => s + h.units, 0); }
+
+function build(plan, meta) {
+  meta = meta || {};
+  const name = meta.name || "Fiber plan";
+  let doc = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>${esc(name)}.kmz</name>\n${styles()}`;
+  let top = "";
+  // boundary, copied back as a polygon
+  const rings = plan.boundary.map(r => `<Polygon><outerBoundaryIs><LinearRing><coordinates>${r.map(p => p[0].toFixed(8) + "," + p[1].toFixed(8) + ",0").join(" ")}</coordinates></LinearRing></outerBoundaryIs></Polygon>`);
+  top += `<Placemark><name>Boundary</name><styleUrl>#boundary</styleUrl><MultiGeometry>${rings.join("")}</MultiGeometry></Placemark>\n`;
+  // XBOX
+  top += folder("XBOX", plan.xboxes.map(x => point("XBOX" + x.n, x.lonlat, "xbox", "Serves hubs: " + x.hubs.map(h => "H" + h).join(", "))).join(""));
+  // Feeder
+  top += folder("Feeder Fiber", plan.feeder.map(f => lineStr(f.name, f.coords, "feeder", "Length " + Math.round(f.length) + " m")).join(""));
+  // Distribution
+  top += folder("Distribution Fiber", plan.hubs.map(h => folder("H" + h.n, h.lines.map(l => lineStr(l.name, l.coords, "line" + ((l.n - 1) % LINE_COLORS.length + 1), "Cable " + Math.round(l.length) + " m · " + l.hp + " homes · " + l.boxes.length + " subboxes")).join(""))).join(""));
+  // HUBBOX
+  top += folder("HUBBOX", plan.hubs.map(h => point("H" + h.n, h.lonlat, "hubbox", h.lines.length + " lines · " + h.hp + " homes · fed from XBOX" + h.xbox)).join(""));
+  // SUBBOX by hub and line
+  top += folder("SUBBOX", plan.hubs.map(h => folder("H" + h.n, h.lines.map(l => folder("L" + l.n, l.boxes.map(b => point(b.name, b.lonlat, "subbox", b.hp + " homes")).join(""), l.boxes.length + " subboxes · " + l.hp + " homes")).join(""), h.lines.reduce((s, l) => s + l.boxes.length, 0) + " subboxes · " + h.hp + " homes")).join(""));
+  // Household Data (Homepass) by hub and line
+  const homeFolder = l => folder("L" + l.n, l.homes.map(x => point(x.name, x.lonlat || [x.lon, x.lat], "home", "Serves " + x.units + (x.units === 1 ? " home" : " homes") + " · " + x.box)).join(""), "Homepass count: " + hpOf(l.homes) + " (" + l.homes.length + " buildings)");
+  const hubHomes = h => folder("H" + h.n, h.lines.map(homeFolder).join(""), "Homepass count: " + h.hp);
+  top += folder("Household Data", plan.hubs.map(hubHomes).join(""), "Homepass count: " + plan.summary.hp + " homes in " + plan.summary.homes + " buildings");
+  // Poles
+  let poles = plan.hubs.map(h => folder("H" + h.n, h.poles.map(p => point(p.label, p.lonlat, "pole", "")).join(""), h.poles.length + " poles")).join("");
+  if (plan.feederPoles.length) poles += folder("Feeder", plan.feederPoles.map(p => point(p.label, p.lonlat, "pole", "")).join(""), plan.feederPoles.length + " poles");
+  top += folder("POLES", poles);
+  const s = plan.summary;
+  const rows = plan.hubs.map(h => `H${h.n}: ${h.lines.length} lines, ${h.lines.reduce((t, l) => t + l.boxes.length, 0)} subboxes, ${h.hp} homepass`).join("\n");
+  doc += folder(name, top, `Homepass count ${s.hp}\n${s.xboxes} XBOX, ${s.hubs} hubs, ${s.lines} lines, ${s.subboxes} subboxes, ${s.poles} poles\n${rows}`);
+  doc += "</Document>\n</kml>\n";
+  return doc;
+}
+
+return { build, LINE_COLORS };
+})();
+if (typeof module !== "undefined") module.exports = KMLOUT;
+
+</script><script>
+/* Minimal slippy map on a canvas: Web-Mercator tiles, pan, wheel/pinch zoom, vector overlay callback. */
+const MAP = (function () {
+"use strict";
+const TS = 256, MAXZ = 21, MINZ = 3;
+const SRC = {
+  sat: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  roads: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+  places: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+};
+function create(canvas, handlers) {
+  const ctx = canvas.getContext("2d");
+  const S = { z: 16, cx: 0, cy: 0, w: 0, h: 0, dpr: 1, layers: { sat: true, labels: true }, draw: null, cache: new Map(), raf: 0, tileFail: 0 };
+  S.cx = lon2x(-0.2, 16); S.cy = lat2y(5.7, 16);
+  function lon2x(lon, z) { return (lon + 180) / 360 * TS * Math.pow(2, z); }
+  function lat2y(lat, z) { const s = Math.sin(lat * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TS * Math.pow(2, z); }
+  function x2lon(x, z) { return x / (TS * Math.pow(2, z)) * 360 - 180; }
+  function y2lat(y, z) { const n = Math.PI - 2 * Math.PI * y / (TS * Math.pow(2, z)); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); }
+  const api = {
+    state: S,
+    toScreen(lon, lat) { return [lon2x(lon, S.z) - S.cx + S.w / 2, lat2y(lat, S.z) - S.cy + S.h / 2]; },
+    toLonLat(px, py) { return [x2lon(px + S.cx - S.w / 2, S.z), y2lat(py + S.cy - S.h / 2, S.z)]; },
+    setView(lon, lat, z) { S.z = Math.max(MINZ, Math.min(MAXZ, z)); S.cx = lon2x(lon, S.z); S.cy = lat2y(lat, S.z); api.redraw(); },
+    fit(minLon, minLat, maxLon, maxLat) {
+      let z = MAXZ;
+      for (; z > MINZ; z -= 0.25) { const w = lon2x(maxLon, z) - lon2x(minLon, z), h = lat2y(minLat, z) - lat2y(maxLat, z); if (w < S.w * 0.88 && h < S.h * 0.88) break; }
+      api.setView((minLon + maxLon) / 2, (minLat + maxLat) / 2, z);
+    },
+    setLayer(k, v) { S.layers[k] = v; api.redraw(); },
+    resize() {
+      const r = canvas.getBoundingClientRect(); S.dpr = window.devicePixelRatio || 1;
+      S.w = Math.max(1, r.width); S.h = Math.max(1, r.height);
+      canvas.width = Math.round(S.w * S.dpr); canvas.height = Math.round(S.h * S.dpr); api.redraw();
+    },
+    redraw() { if (!S.raf) S.raf = requestAnimationFrame(render); }
+  };
+  function tile(kind, z, x, y) {
+    const key = kind + "/" + z + "/" + x + "/" + y; let t = S.cache.get(key);
+    if (!t) {
+      const img = new Image(); t = { img, ok: false, bad: false };
+      img.onload = () => { t.ok = true; api.redraw(); };
+      img.onerror = () => { t.bad = true; S.tileFail++; if (handlers && handlers.onTileError) handlers.onTileError(S.tileFail); };
+      img.src = SRC[kind].replace("{z}", z).replace("{y}", y).replace("{x}", x);
+      S.cache.set(key, t);
+      if (S.cache.size > 900) { const k0 = S.cache.keys().next().value; S.cache.delete(k0); }
+    }
+    return t;
+  }
+  function drawTiles(kind) {
+    const zi = Math.min(19, Math.max(0, Math.round(S.z))), sc = Math.pow(2, S.z - zi), ts = TS * sc;
+    const n = Math.pow(2, zi);
+    const cxi = S.cx / sc, cyi = S.cy / sc, hw = S.w / 2 / sc, hh = S.h / 2 / sc;
+    const x0 = Math.floor((cxi - hw) / TS), x1 = Math.floor((cxi + hw) / TS), y0 = Math.floor((cyi - hh) / TS), y1 = Math.floor((cyi + hh) / TS);
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+      if (ty < 0 || ty >= n) continue;
+      const t = tile(kind, zi, ((tx % n) + n) % n, ty);
+      const sx = tx * ts - S.cx + S.w / 2, sy = ty * ts - S.cy + S.h / 2;
+      if (t.ok) ctx.drawImage(t.img, sx, sy, ts + 0.5, ts + 0.5);
+    }
+  }
+  function render() {
+    S.raf = 0; ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+    ctx.fillStyle = "#1c2a2f"; ctx.fillRect(0, 0, S.w, S.h);
+    if (S.layers.sat) drawTiles("sat");
+    if (S.layers.labels) { drawTiles("roads"); drawTiles("places"); }
+    if (S.draw) S.draw(ctx, api, S);
+  }
+  /* interaction */
+  let drag = null, pts = new Map(), pinch = null;
+  function zoomAt(px, py, dz) {
+    const ll = api.toLonLat(px, py), nz = Math.max(MINZ, Math.min(MAXZ, S.z + dz)); if (nz === S.z) return;
+    S.z = nz; const nx = lon2x(ll[0], nz), ny = lat2y(ll[1], nz); S.cx = nx - (px - S.w / 2); S.cy = ny - (py - S.h / 2); api.redraw();
+  }
+  canvas.addEventListener("wheel", e => { e.preventDefault(); const r = canvas.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, -Math.sign(e.deltaY) * (e.ctrlKey ? 0.25 : 0.5)); }, { passive: false });
+  canvas.addEventListener("pointerdown", e => {
+    canvas.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 1) drag = { x: e.clientX, y: e.clientY, moved: 0 };
+    else if (pts.size === 2) { const a = [...pts.values()]; pinch = { d: Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]), z: S.z }; drag = null; }
+  });
+  canvas.addEventListener("pointermove", e => {
+    const r = canvas.getBoundingClientRect();
+    if (handlers && handlers.onMove) handlers.onMove(api.toLonLat(e.clientX - r.left, e.clientY - r.top), e.clientX - r.left, e.clientY - r.top);
+    if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pinch && pts.size === 2) {
+      const a = [...pts.values()], d = Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]);
+      const mx = (a[0][0] + a[1][0]) / 2 - r.left, my = (a[0][1] + a[1][1]) / 2 - r.top;
+      zoomAt(mx, my, Math.log2(d / pinch.d) + pinch.z - S.z); return;
+    }
+    if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY; S.cx -= dx; S.cy -= dy; api.redraw(); }
+  });
+  const up = e => {
+    const was = drag; pts.delete(e.pointerId); if (pts.size < 2) pinch = null;
+    if (was && was.moved < 5 && handlers && handlers.onClick) { const r = canvas.getBoundingClientRect(); handlers.onClick(api.toLonLat(e.clientX - r.left, e.clientY - r.top), e.clientX - r.left, e.clientY - r.top); }
+    drag = pts.size === 1 ? null : null;
+  };
+  canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
+  window.addEventListener("resize", api.resize);
+  api.zoomBy = dz => zoomAt(S.w / 2, S.h / 2, dz);
+  api.resize();
+  return api;
+}
+return { create };
+})();
+
+</script><script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const HUBCOL = ["#ff6b6b", "#4dd0ff", "#ffd24d", "#a78bfa", "#5eead4", "#fb923c", "#f472b6", "#a3e635", "#60a5fa", "#e879f9"];
+const LINECOL = ["#ffff00", "#00ff66", "#00aaff", "#ffaa00", "#ff44ff", "#ffffff"];
+const S = { name: "boundary", boundary: null, bbox: null, osm: null, extra: [], removed: new Set(), mode: "view", plan: null, nextId: 1, L: {} };
+document.querySelectorAll("[data-l]").forEach(c => { S.L[c.dataset.l] = c.checked; c.onchange = () => { S.L[c.dataset.l] = c.checked; if (c.dataset.l === "sat" || c.dataset.l === "labels") map.setLayer(c.dataset.l, c.checked); else map.redraw(); }; });
+
+const map = MAP.create($("cv"), {
+  onTileError: n => { if (n > 6) $("banner").style.display = "block"; },
+  onMove: ll => { $("hud").textContent = ll[1].toFixed(6) + ", " + ll[0].toFixed(6) + "  ·  z" + map.state.z.toFixed(1); },
+  onClick: (ll, px, py) => {
+    if (S.mode === "add") { addHome(ll); }
+    else if (S.mode === "del") { delHome(px, py); }
+  }
+});
+map.state.draw = draw;
+$("zi").onclick = () => map.zoomBy(0.5); $("zo").onclick = () => map.zoomBy(-0.5);
+
+function busy(on, tx) { $("busy").classList.toggle("on", on); if (tx) $("busytx").textContent = tx; }
+function say(id, tx, cls) { const e = $(id); e.textContent = tx; e.className = "msg" + (cls ? " " + cls : ""); }
+const nextFrame = () => new Promise(r => setTimeout(r, 30));
+
+/* ------------------------------------------------------------ file reading */
+async function readKml(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (/\.kml$/i.test(file.name) || (buf[0] !== 0x50 || buf[1] !== 0x4b)) return new TextDecoder().decode(buf);
+  const ens = ZipX.readZip(buf);
+  const en = ens.find(e => /(^|\/)doc\.kml$/i.test(e.name)) || ens.find(e => /\.kml$/i.test(e.name));
+  if (!en) throw new Error("No KML found inside that KMZ.");
+  return new TextDecoder().decode(await ZipX.entryData(en));
+}
+const parseCoords = t => t.trim().split(/\s+/).map(s => s.split(",").map(Number)).filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1])).map(a => [a[0], a[1]]);
+function parsePolygons(kml) {
+  const rings = []; let m;
+  const rp = /<outerBoundaryIs>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g;
+  while ((m = rp.exec(kml))) { const r = parseCoords(m[1]); if (r.length >= 3) rings.push(r); }
+  if (!rings.length) { // fall back to closed LineStrings
+    const lp = /<LineString>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g;
+    while ((m = lp.exec(kml))) { const r = parseCoords(m[1]); if (r.length >= 4 && Math.hypot(r[0][0] - r[r.length - 1][0], r[0][1] - r[r.length - 1][1]) < 1e-6) rings.push(r); }
+  }
+  return rings;
+}
+function parsePoints(kml) {
+  const out = []; const re = /<Point>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>/g; let m;
+  while ((m = re.exec(kml))) { const c = parseCoords(m[1])[0]; if (c) out.push(c); }
+  return out;
+}
+const bboxOf = rings => { let a = 180, b = 90, c = -180, d = -90; rings.forEach(r => r.forEach(p => { a = Math.min(a, p[0]); c = Math.max(c, p[0]); b = Math.min(b, p[1]); d = Math.max(d, p[1]); })); return [a, b, c, d]; };
+function inRing(x, y, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if ((r[i][1] > y) !== (r[j][1] > y) && x < (r[j][0] - r[i][0]) * (y - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) c = !c; return c; }
+const inBoundary = (x, y) => S.boundary && S.boundary.some(r => inRing(x, y, r));
+
+$("fb").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const kml = await readKml(f); const rings = parsePolygons(kml);
+    if (!rings.length) throw new Error("No polygon found. The boundary must be a drawn polygon (or a closed line).");
+    S.boundary = rings; S.bbox = bboxOf(rings); S.name = f.name.replace(/\.(kmz|kml)$/i, ""); S.osm = null; S.cells = null; S.plan = null; S.extra = []; S.removed = new Set();
+    const b = S.bbox, kmx = 111.32 * Math.cos((b[1] + b[3]) / 2 * Math.PI / 180), area = (b[2] - b[0]) * kmx * (b[3] - b[1]) * 110.57;
+    say("mb", f.name + " — " + rings.length + " polygon" + (rings.length > 1 ? "s" : "") + ", bounding box about " + area.toFixed(2) + " km².", "ok");
+    if (area > 25) say("mb", f.name + " loaded, but the area is large (" + area.toFixed(0) + " km² box). OpenStreetMap may time out — consider splitting it.", "err");
+    $("bfetch").disabled = false; $("bgen").disabled = true; $("res").style.display = "none";
+    say("mf", "Pulls every building and road inside the boundary. Needs an internet connection.");
+    map.fit(b[0], b[1], b[2], b[3]);
+  } catch (err) { say("mb", err.message, "err"); }
+  e.target.value = "";
+};
+
+/* ------------------------------------------------------------ OpenStreetMap */
+/* Robust Overpass downloader: any boundary size.
+   - several public servers, each used one request at a time, with health tracking + cool-downs
+   - a cell that times out / is too heavy is automatically split into 4 smaller cells (down to ~90 m)
+   - rate-limits (429) are honoured, replies cut short by the server are never accepted as complete
+   - finished pieces are kept, so Cancel / a later click on Fetch resumes where it stopped */
+const MIRRORS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+].map(u => ({ u, busy: false, until: 0, last: 0, bad: 0 }));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let fetchAbort = false;
+const MIN_CELL = 0.0008, CLIENT_MS = 55000, GAP_MS = 400;
+const HW_SKIP = "^(proposed|construction|raceway|bus_guideway|platform|elevator|corridor|abandoned)$";
+const mkQuery = bb => `[out:json][timeout:30];(way["building"](${bb});way["highway"]["highway"!~"${HW_SKIP}"](${bb}););out geom qt;`;
+const herr = (msg, o) => Object.assign(new Error(msg), o || {});
+
+async function overpassOnce(m, q, ms) {
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await fetch(m.u, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" }, signal: ctl.signal });
+    if (r.status === 429) throw herr("HTTP 429 (rate limited)", { cool: (+r.headers.get("Retry-After") || 20) * 1000 });
+    if (r.status === 503) throw herr("HTTP 503 (server busy)", { cool: 10000 });
+    if (r.status === 502 || r.status === 504) throw herr("HTTP " + r.status);
+    if (!r.ok) throw herr("HTTP " + r.status);
+    let j; try { j = JSON.parse(await r.text()); } catch (e) { throw herr("incomplete reply", { heavy: true }); }
+    if (!j || !Array.isArray(j.elements)) throw herr("bad reply", { heavy: true });
+    if (j.remark && /timed out|out of memory|runtime error|too many/i.test(j.remark)) throw herr("server gave up (area too heavy)", { heavy: true });
+    return j.elements;
+  } catch (e) { throw e.name === "AbortError" ? herr("timed out", { heavy: true }) : e; } finally { clearTimeout(to); }
+}
+async function acquire() {
+  for (;;) {
+    if (fetchAbort) throw new Error("cancelled");
+    const now = Date.now(), free = MIRRORS.filter(m => !m.busy && m.until <= now).sort((a, b) => a.last - b.last);
+    if (free.length) { const m = free[0]; m.busy = true; const w = m.last + GAP_MS - now; if (w > 0) await sleep(w); m.last = Date.now(); return m; }
+    await sleep(250);
+  }
+}
+function penalize(m, e) {
+  const now = Date.now();
+  m.bad++;                                           /* consecutive failures; reset by a success */
+  if (e.cool) m.until = now + e.cool;
+  else m.until = now + Math.min(60000, (e.heavy ? 1500 : 3000) * Math.pow(2, Math.min(m.bad - 1, 5)));
+}
+/* one rectangle: returns its elements, or null meaning "too heavy, please split me" */
+async function fetchLeaf(bb, C) {
+  const key = bb.map(v => v.toFixed(6)).join(",");
+  if (C.leaf.has(key)) return C.leaf.get(key);
+  const size = Math.max(bb[2] - bb[0], bb[3] - bb[1]), canSplit = size / 2 >= MIN_CELL;
+  let heavy = 0, last = null;
+  for (let tries = 0; tries < 12; tries++) {
+    const m = await acquire();
+    try {
+      C.reqs++; C.onStatus && C.onStatus();
+      const els = await overpassOnce(m, mkQuery(key), CLIENT_MS);
+      m.busy = false; m.bad = 0; C.leaf.set(key, els); return els;
+    } catch (e) {
+      m.busy = false; if (e.message === "cancelled") throw e;
+      last = e; C.lastErr = e.message; C.retries++; penalize(m, e);
+      if (e.heavy && ++heavy >= (size > 0.003 ? 1 : 2) && canSplit) return null;
+    }
+  }
+  throw last || new Error("no server reachable");
+}
+/* learns the largest area size the servers accept right now, so later cells start at that size */
+async function fetchCell(bb, C) {
+  const size = Math.max(bb[2] - bb[0], bb[3] - bb[1]);
+  if (size > C.maxSize && size / 2 >= MIN_CELL) return splitCell(bb, C);
+  const els = await fetchLeaf(bb, C);
+  if (els) { if (C.maxSize < Infinity && ++C.okRun >= 10) { C.maxSize *= 1.5; C.okRun = 0; } return els; }
+  C.maxSize = Math.min(C.maxSize, size / 2); C.okRun = 0;
+  return splitCell(bb, C);
+}
+async function splitCell(bb, C) {
+  C.splits++; C.onStatus && C.onStatus();
+  const [s, w, n, e] = bb, my = (s + n) / 2, mx = (w + e) / 2, out = [];
+  for (const q of [[s, w, my, mx], [s, mx, my, e], [my, w, n, mx], [my, mx, n, e]]) out.push(...await fetchCell(q, C));
+  return out;
+}
+/* split the boundary's bounding box into cells; skip cells outside the boundary */
+function makeCells(b) {
+  const CELL = 0.0065, pad = 0.0004, cells = [];
+  const nx = Math.max(1, Math.ceil((b[2] - b[0]) / CELL)), ny = Math.max(1, Math.ceil((b[3] - b[1]) / CELL));
+  const dx = (b[2] - b[0]) / nx, dy = (b[3] - b[1]) / ny;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+    const x0 = b[0] + i * dx, y0 = b[1] + j * dy, x1 = x0 + dx, y1 = y0 + dy; let hit = false;
+    for (let u = 0; u <= 6 && !hit; u++) for (let v = 0; v <= 6 && !hit; v++) if (inBoundary(x0 + dx * u / 6, y0 + dy * v / 6)) hit = true;
+    if (!hit) S.boundary.forEach(r => r.forEach(p => { if (p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1) hit = true; }));
+    if (hit) cells.push([y0 - pad, x0 - pad, y1 + pad, x1 + pad]);
+  }
+  return cells;
+}
+$("bfetch").onclick = async () => {
+  if (!S.bbox) return;
+  if (!S.cells) S.cells = { list: makeCells(S.bbox), done: new Map(), leaf: new Map(), reqs: 0, retries: 0, splits: 0, maxSize: Infinity, okRun: 0 };
+  const C = S.cells, todo = C.list.map((c, i) => i).filter(i => !C.done.has(i)), total = C.list.length, t0 = Date.now();
+  MIRRORS.forEach(m => { m.busy = false; m.until = 0; m.bad = 0; });
+  fetchAbort = false; $("bcancel").style.display = ""; $("bfetch").disabled = true;
+  let idx = 0, failed = 0;
+  const upd = () => {
+    const wait = MIRRORS.filter(m => m.until > Date.now()).length;
+    say("mf", "Downloading from OpenStreetMap… " + C.done.size + " of " + total + " areas done" +
+      (C.splits ? " · " + C.splits + " splits into smaller areas" : "") +
+      (C.retries ? " · " + C.retries + " retr" + (C.retries > 1 ? "ies" : "y") : "") +
+      (wait ? " · " + wait + " of " + MIRRORS.length + " servers resting" : "") + ".");
+  };
+  C.onStatus = upd; upd();
+  if (total > 300) say("mf", "Large boundary: " + total + " areas. This can take a while; you can Cancel and resume at any time.");
+  const worker = async () => {
+    while (idx < todo.length && !fetchAbort) {
+      const i = todo[idx++];
+      try { C.done.set(i, await fetchCell(C.list[i], C)); }
+      catch (e) { if (e.message !== "cancelled") { failed++; C.lastErr = e.message; } }
+      upd();
+    }
+  };
+  await Promise.all(MIRRORS.map(worker));
+  C.onStatus = null; $("bcancel").style.display = "none"; $("bfetch").disabled = false;
+  if (fetchAbort) { say("mf", "Cancelled. " + C.done.size + " of " + total + " areas downloaded — click Fetch again to continue.", "err"); return; }
+  if (C.done.size < total) { say("mf", C.done.size + " of " + total + " areas downloaded; " + (total - C.done.size) + " could not be fetched (" + C.lastErr + "). Click Fetch again to retry only those; finished areas are kept.", "err"); return; }
+  const seen = new Set(), els = [];
+  C.done.forEach(arr => arr.forEach(e => { const k = e.type + e.id; if (!seen.has(k)) { seen.add(k); els.push(e); } }));
+  S.osm = FP.parseOverpass({ elements: els }); S.plan = null; S.removed = new Set();
+  const inside = S.osm.buildings.filter(x => inBoundary(x.lon, x.lat)).length;
+  say("mf", "Found " + inside + " buildings inside the boundary and " + S.osm.roads.length + " road segments nearby (" + Math.round((Date.now() - t0) / 1000) + " s).", inside ? "ok" : "err");
+  if (!inside) say("mf", "OpenStreetMap has no buildings in this boundary. Add homes manually or import home points (see “Edit homes on the map”).", "err");
+  enableGen(); $("res").style.display = "none"; map.redraw();
+};
+$("bcancel").onclick = () => { fetchAbort = true; };
+
+/* ------------------------------------------------------------ manual edits */
+function setMode(m) { S.mode = S.mode === m ? "view" : m; $("madd").classList.toggle("on", S.mode === "add"); $("mdel").classList.toggle("on", S.mode === "del"); $("cv").style.cursor = S.mode === "view" ? "grab" : "crosshair"; }
+$("madd").onclick = () => setMode("add"); $("mdel").onclick = () => setMode("del");
+function enableGen() { $("bgen").disabled = !(S.boundary && ((S.osm && S.osm.buildings.length) || S.extra.length)); }
+function mkExtra(ll, kind) {
+  const tags = kind === "biz" ? { building: "retail", shop: "yes" } : { building: kind === "mdu" ? "apartments" : "house" };
+  return { id: "m" + (S.nextId++), lon: ll[0], lat: ll[1], area: kind === "mdu" ? 320 : 80, levels: kind === "mdu" ? 2 : 1, tags, manual: true };
+}
+function addHome(ll) {
+  if (!S.boundary) return;
+  if (!inBoundary(ll[0], ll[1])) { say("me", "That spot is outside the boundary.", "err"); return; }
+  S.extra.push(mkExtra(ll, $("mkind").value)); S.plan = null; $("res").style.display = "none"; enableGen(); say("me", S.extra.length + " home(s) added by hand. Generate again to include them.", "ok"); map.redraw();
+}
+function delHome(px, py) {
+  let best = null, bd = 16;
+  const all = effective();
+  for (const b of all) { const p = map.toScreen(b.lon, b.lat), d = Math.hypot(p[0] - px, p[1] - py); if (d < bd) { bd = d; best = b; } }
+  if (!best) return;
+  if (best.manual) S.extra = S.extra.filter(x => x !== best); else S.removed.add(best.id);
+  S.plan = null; $("res").style.display = "none"; say("me", "Home removed. Generate again to update.", "ok"); map.redraw();
+}
+function effective() { return ((S.osm ? S.osm.buildings.filter(b => !S.removed.has(b.id)) : [])).concat(S.extra).filter(b => inBoundary(b.lon, b.lat)); }
+$("fh").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const pts = parsePoints(await readKml(f)).filter(p => inBoundary(p[0], p[1]));
+    pts.forEach(p => S.extra.push(mkExtra(p, "sdu"))); S.plan = null; enableGen();
+    say("me", "Imported " + pts.length + " home points inside the boundary (each counted as one home).", pts.length ? "ok" : "err"); map.redraw();
+  } catch (err) { say("me", err.message, "err"); }
+  e.target.value = "";
+};
+
+/* ------------------------------------------------------------ generate */
+const num = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : undefined; };
+$("bgen").onclick = async () => {
+  const bl = effective(); if (!bl.length) { say("mg", "No homes to plan.", "err"); return; }
+  const opts = {}; ["poleMax", "hubLinesMax", "xboxHubsMax", "lineBoxesMax", "boxHP", "boxSpacingMin", "boxSpacingMax", "hubHPTarget"].forEach(k => { const v = num("o_" + k); if (v !== undefined) opts[k] = v; });
+  opts.poleMax = Math.min(opts.poleMax || 60, 60) - 0.5;
+  busy(true, "Planning " + bl.length + " buildings…"); await nextFrame();
+  try {
+    S.plan = FP.plan({ boundary: S.boundary, buildings: bl, roads: S.osm ? S.osm.roads : [] }, opts);
+    showResult(); say("mg", "");
+  } catch (e) { console.error(e); S.plan = null; say("mg", "Planning failed: " + (e.message || e), "err"); }
+  busy(false); map.redraw();
+};
+function showResult() {
+  const p = S.plan, s = p.summary; $("res").style.display = "";
+  const T = [["Homepass", s.hp], ["Buildings", s.homes], ["XBOX", s.xboxes], ["Hubs", s.hubs], ["Lines", s.lines], ["Subboxes", s.subboxes], ["Poles", s.poles]];
+  $("tiles").innerHTML = T.map(t => `<div class="tile"><b>${t[1]}</b><span>${t[0]}</span></div>`).join("");
+  $("checks").innerHTML = p.validation.map(v => { const c = v.pass ? "p" : v.soft ? "s" : "f"; return `<div class="chk ${c}"><i>${v.pass ? "✓" : v.soft ? "!" : "✕"}</i><div>${v.rule}<br><span>${v.detail}</span></div></div>`; }).join("");
+  $("hubs").innerHTML = p.hubs.map((h, i) => `<tr data-h="${i}"><td><span class="sw" style="background:${HUBCOL[i % HUBCOL.length]}"></span>H${h.n}</td><td>X${h.xbox}</td><td>${h.lines.length}</td><td>${h.lines.reduce((t, l) => t + l.boxes.length, 0)}</td><td>${h.hp}</td></tr>`).join("");
+  $("hubs").querySelectorAll("tr").forEach(tr => tr.onclick = () => { const h = p.hubs[+tr.dataset.h]; map.setView(h.lonlat[0], h.lonlat[1], 18); });
+  $("res").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/* ------------------------------------------------------------ downloads */
+function save(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); }
+$("dkmz").onclick = async () => {
+  if (!S.plan) return;
+  try {
+    const kml = KMLOUT.build(S.plan, { name: S.name + "_fiber_plan" });
+    save(await ZipX.writeZip([{ name: "doc.kml", data: ZipX.enc.encode(kml) }]), S.name + "_fiber_plan.kmz");
+  } catch (e) { say("mg", "Could not build the KMZ: " + e.message, "err"); }
+};
+$("dcsv").onclick = () => {
+  if (!S.plan) return;
+  const rows = [["Homepass name", "Homes served", "Type", "Hub", "Line", "Subbox", "Latitude", "Longitude"]];
+  S.plan.hubs.forEach(h => h.lines.forEach(l => l.homes.forEach(x => rows.push([x.name, x.units, x.kind, "H" + h.n, "L" + l.n, x.box, x.lat.toFixed(7), x.lon.toFixed(7)]))));
+  save(new Blob([rows.map(r => r.map(c => /[",\n]/.test(c) ? '"' + String(c).replace(/"/g, '""') + '"' : c).join(",")).join("\n")], { type: "text/csv" }), S.name + "_homepass.csv");
+};
+
+/* ------------------------------------------------------------ drawing */
+function draw(ctx, m, st) {
+  const z = st.z, P = S.plan;
+  if (S.L.roads && S.osm) { ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 1; S.osm.roads.forEach(r => { ctx.beginPath(); r.pts.forEach((q, i) => { const s = m.toScreen(q[0], q[1]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.stroke(); }); }
+  if (S.boundary) { ctx.strokeStyle = "#ff3b3b"; ctx.lineWidth = 2.5; ctx.setLineDash([]); S.boundary.forEach(r => { ctx.beginPath(); r.forEach((q, i) => { const s = m.toScreen(q[0], q[1]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.closePath(); ctx.stroke(); }); }
+  if (S.L.bld) {
+    const list = effective(), hubOf = P ? new Map(P.homes.map(h => [h.srcId, h])) : null;
+    ctx.fillStyle = "rgba(255,210,77,.35)"; ctx.strokeStyle = "rgba(255,210,77,.9)"; ctx.lineWidth = 1;
+    if (z >= 16.5) list.forEach(b => { if (!b.poly) return; ctx.beginPath(); b.poly.forEach((q, i) => { const s = m.toScreen(q[0], q[1]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.closePath(); ctx.fill(); ctx.stroke(); });
+    const r = z >= 18 ? 4 : z >= 16 ? 3 : 2;
+    list.forEach(b => {
+      const s = m.toScreen(b.lon, b.lat); if (s[0] < -10 || s[1] < -10 || s[0] > st.w + 10 || s[1] > st.h + 10) return;
+      const h = hubOf && hubOf.get(b.id);
+      ctx.fillStyle = h ? HUBCOL[(h.hub - 1) % HUBCOL.length] : b.manual ? "#2ee6a6" : "#ffd24d"; ctx.strokeStyle = "#000"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, 6.3); ctx.fill(); ctx.stroke();
+    });
+  }
+  if (!P) return;
+  if (S.L.lines) {
+    ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+    P.hubs.forEach(h => h.lines.forEach(l => { ctx.strokeStyle = LINECOL[(l.n - 1) % 6]; ctx.beginPath(); l.coords.forEach((q, i) => { const s = m.toScreen(q[0], q[1]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.stroke(); }));
+    ctx.strokeStyle = "#ff8a00"; ctx.lineWidth = 3.5; P.feeder.forEach(f => { ctx.beginPath(); f.coords.forEach((q, i) => { const s = m.toScreen(q[0], q[1]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.stroke(); });
+  }
+  const label = (t, x, y, col) => { ctx.font = "600 11px system-ui"; ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(t, x, y); ctx.fillStyle = col || "#fff"; ctx.fillText(t, x, y); };
+  if (S.L.poles) {
+    const all = P.hubs.flatMap(h => h.poles).concat(P.feederPoles || []);
+    all.forEach(p => {
+      const s = m.toScreen(p.lonlat[0], p.lonlat[1]); if (s[0] < -30 || s[1] < -30 || s[0] > st.w + 30 || s[1] > st.h + 30) return;
+      ctx.fillStyle = "#fff"; ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(s[0], s[1], z >= 18 ? 3.2 : 2.2, 0, 6.3); ctx.fill(); ctx.stroke();
+      if (S.L.plabels && z >= 18.5 && p.label && p.label !== "0m") label(p.label, s[0] + 5, s[1] - 4);
+    });
+  }
+  if (S.L.boxes) {
+    P.hubs.forEach(h => h.lines.forEach(l => l.boxes.forEach(b => {
+      const s = m.toScreen(b.lonlat[0], b.lonlat[1]); ctx.fillStyle = "#18c964"; ctx.strokeStyle = "#000"; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(s[0], s[1] - 7); ctx.lineTo(s[0] + 6.5, s[1] + 5); ctx.lineTo(s[0] - 6.5, s[1] + 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+      if (z >= 17.5) label(b.name + " · " + b.hp, s[0] + 9, s[1] + 4, "#b6ffd2");
+    })));
+    P.hubs.forEach(h => { const s = m.toScreen(h.lonlat[0], h.lonlat[1]); ctx.fillStyle = "#fff"; ctx.strokeStyle = "#e11"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(s[0], s[1], 9, 0, 6.3); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#e11"; ctx.fillRect(s[0] - 1.6, s[1] - 5, 3.2, 10); ctx.fillRect(s[0] - 5, s[1] - 1.6, 10, 3.2); label("H" + h.n, s[0] + 12, s[1] + 4, "#ffd1d1"); });
+    P.xboxes.forEach(x => { const s = m.toScreen(x.lonlat[0], x.lonlat[1]); ctx.fillStyle = "#18c964"; ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.fillRect(s[0] - 9, s[1] - 9, 18, 18); ctx.strokeRect(s[0] - 9, s[1] - 9, 18, 18); label("XBOX" + x.n, s[0] + 13, s[1] + 4, "#b6ffd2"); });
+  }
+}
+window.__app = { S, map, parsePolygons };
+map.redraw();
+})();
+
+</script></body></html>
